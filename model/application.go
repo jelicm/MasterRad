@@ -1,6 +1,6 @@
 package model
 
 type Application struct {
-	ApplicationId     string
-	ParentNamespaceId string
+	ApplicationId     string `json:"applicationID"`
+	ParentNamespaceId string `json:"parentNamespaceId"`
 }

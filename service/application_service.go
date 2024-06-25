@@ -1,4 +1,4 @@
-package servce
+package service
 
 import (
 	"fmt"
@@ -15,9 +15,9 @@ func NewApplicationService(store model.Store) *ApplicationService {
 	}
 }
 
-func (service *ApplicationService) RunApplication(parentNamespaceId string, sizeKB int) {
+func (service *ApplicationService) RunApplication(applicationId, parentNamespaceId string, sizeKB int) {
 	app := model.Application{
-		ApplicationId:     "app123",
+		ApplicationId:     applicationId,
 		ParentNamespaceId: parentNamespaceId,
 	}
 
@@ -25,11 +25,12 @@ func (service *ApplicationService) RunApplication(parentNamespaceId string, size
 	fmt.Printf("ApplicationId: %s, ParentNamespaceId: %s\n", app.ApplicationId, app.ParentNamespaceId)
 
 	ds := model.DataSpace{
-		SizeKB: sizeKB,
-		State:  model.Open,
-		Root:   model.DataSpaceItem{},
+		DataSpaceId: app.ApplicationId,
+		SizeKB:      sizeKB,
+		State:       model.Open,
+		Root:        model.DataSpaceItem{},
 	}
 
-	service.store.PutDataSpace(&ds)
+	service.store.PutDataSpace(app.ApplicationId, &ds)
 	fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
 }

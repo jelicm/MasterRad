@@ -8,14 +8,15 @@ const (
 )
 
 type DataSpaceItem struct {
-	DataSpaceItemId string
-	SizeKB          int
-	Children        []DataSpaceItem
-	Parent          *DataSpaceItem
+	DataSpaceItemId string          `json:"dataSpaceItemId"`
+	SizeKB          int             `json:"sizeKb"`
+	Children        []DataSpaceItem `json:"children"`
+	ParentId        string          `json:"parentId"`
 }
 
 type DataSpace struct {
-	SizeKB int
-	State  State
-	Root   DataSpaceItem
+	DataSpaceId string        `json:"dataSpaceId"`
+	SizeKB      int           `json:"sizeKB"`
+	State       State         `json:"state"`
+	Root        DataSpaceItem `json:"root"`
 }

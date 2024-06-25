@@ -1,7 +1,7 @@
 package model
 
 type Namsespace struct {
-	ParentNamspaceId string
-	Id               string
-	MaxSpaceKB       int
+	ParentNamspaceId string `json:"parentNamspaceId"`
+	Id               string `json:"id"`
+	MaxSpaceKB       int    `json:"maxSpaceKB"`
 }
