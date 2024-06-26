@@ -22,8 +22,11 @@ const (
 	//dataspace/applicationid/dataspaceid
 	dataSpaceKey = "dataspace/%s/%s"
 
-	//dataspaceitem/dataspaceid/dataspaceitemid
+	//dataspaceitem/path/dataspaceitemid
 	dataSpaceItemKey = "dataspaceitem/%s/%s"
+
+	//hardlink/namespaceid/applicationid/dataspaceitemid
+	hardlinkKey = "hardlink/%s/%s"
 )
 
 func key_ns(id, template string) string {
@@ -82,6 +85,39 @@ func (db *DB) PutDataSpace(applicationID string, dataSpace *model.DataSpace) err
 	key := key(applicationID, dataSpace.DataSpaceId, dataSpaceKey)
 
 	jsonData, err := json.Marshal(dataSpace)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Kv.Put(ctx, key, string(jsonData))
+
+	return err
+}
+
+func (db *DB) PutDataSpaceItem(dataSpaceItem *model.DataSpaceItem) error {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+	path := fmt.Sprintf("%s/%s", dataSpaceItem.Path, dataSpaceItem.Name)
+	key := key(path, dataSpaceItem.DataSpaceItemId, dataSpaceItemKey)
+
+	jsonData, err := json.Marshal(dataSpaceItem)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Kv.Put(ctx, key, string(jsonData))
+
+	return err
+}
+
+func (db *DB) PutHardlink(hardlink *model.Hardlink) error {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+	key := key(hardlink.ApplicationID, hardlink.DataSpaceItemID, hardlinkKey)
+
+	jsonData, err := json.Marshal(hardlink)
 	if err != nil {
 		return err
 	}

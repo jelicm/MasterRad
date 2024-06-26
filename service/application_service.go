@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"projekat/model"
 )
 
@@ -19,9 +20,14 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	app := model.Application{
 		ApplicationId:     applicationId,
 		ParentNamespaceId: parentNamespaceId,
+		DataSpaceId:       applicationId,
 	}
 
-	service.store.PutApp(&app)
+	err := service.store.PutApp(&app)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("ApplicationId: %s, ParentNamespaceId: %s\n", app.ApplicationId, app.ParentNamespaceId)
 
 	ds := model.DataSpace{
@@ -31,6 +37,27 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 		Root:        model.DataSpaceItem{},
 	}
 
-	service.store.PutDataSpace(app.ApplicationId, &ds)
+	err = service.store.PutDataSpace(app.ApplicationId, &ds)
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
+}
+
+func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *model.DataSpaceItem) {
+	err := service.store.PutDataSpaceItem(dsi)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//uspesno dodat idem, sad treba da se kreira hl
+	hardlink := model.Hardlink{
+		ApplicationID:   app.ApplicationId,
+		DataSpaceItemID: dsi.DataSpaceItemId,
+	}
+	err = service.store.PutHardlink(&hardlink)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

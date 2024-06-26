@@ -8,10 +8,12 @@ const (
 )
 
 type DataSpaceItem struct {
-	DataSpaceItemId string          `json:"dataSpaceItemId"`
-	SizeKB          int             `json:"sizeKb"`
-	Children        []DataSpaceItem `json:"children"`
-	ParentId        string          `json:"parentId"`
+	DataSpaceItemId string `json:"id"`
+	Path            string `json:"path"`
+	SizeKB          int    `json:"sizeKb"`
+	Name            string `json:"name"`
+	DataSpaceId     string `json:"appID"`
+	IsFile          bool   `json:"isFile"`
 }
 
 type DataSpace struct {
