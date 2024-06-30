@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"projekat/model"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-
-	"projekat/model"
 )
 
 const (
@@ -27,6 +26,8 @@ const (
 
 	//hardlink/namespaceid/applicationid/dataspaceitemid
 	hardlinkKey = "hardlink/%s/%s"
+	//softlink/dataspaceid/applicationid
+	softlinkKey = "softlink/%s/%s"
 )
 
 func key_ns(id, template string) string {
@@ -115,9 +116,25 @@ func (db *DB) PutHardlink(hardlink *model.Hardlink) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	key := key(hardlink.ApplicationID, hardlink.DataSpaceItemID, hardlinkKey)
+	key := key(hardlink.ApplicationID, hardlink.DataSpaceID, hardlinkKey)
 
 	jsonData, err := json.Marshal(hardlink)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Kv.Put(ctx, key, string(jsonData))
+
+	return err
+}
+
+func (db *DB) PutSoftlink(softlink *model.Softlink) error {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+	key := key(softlink.DataSpaceID, softlink.ApplicationID, softlinkKey)
+
+	jsonData, err := json.Marshal(softlink)
 	if err != nil {
 		return err
 	}
@@ -145,4 +162,51 @@ func (db *DB) GetApp(namespaceID, appID string) (*model.Application, error) {
 	}
 
 	return &app, nil
+}
+
+func (db *DB) GetDataSpace(applicationID string, dataSpaceId string) (*model.DataSpace, error) {
+	key := key(applicationID, dataSpaceId, dataSpaceKey)
+	resp, err := db.Kv.Get(context.Background(), key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Kvs) == 0 {
+		log.Fatalf("No data found for the key")
+	}
+
+	var ds model.DataSpace
+	err = json.Unmarshal(resp.Kvs[0].Value, &ds)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ds, nil
+}
+
+func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
+	prefix := "softlink/" + dataSpaceId
+
+	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	if err != nil {
+		log.Fatalf("Failed to get data from etcd: %v", err)
+	}
+
+	ops := []clientv3.Op{}
+
+	for _, kv := range resp.Kvs {
+		ops = append(ops, clientv3.OpDelete(string(kv.Key)))
+	}
+
+	if len(ops) > 0 {
+		_, err = db.Kv.Txn(context.Background()).Then(ops...).Commit()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deleted %d keys\n", len(ops))
+	} else {
+		fmt.Println("No keys with requested prefix!")
+	}
+
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"projekat/model"
 	"projekat/service"
 	"projekat/store"
 )
@@ -22,7 +23,15 @@ func main() {
 
 	service := service.NewApplicationService(db)
 
-	service.RunApplication("app1", "ns1", 25)
+	app1, _ := service.RunApplication("app1", "ns1", 25)
+
+	app2, _ := service.RunApplication("app2", "ns2", 100)
+
+	service.CreateDataItem(app1, &model.DataSpaceItem{DataSpaceItemId: "dsi", Path: "", Name: "fajl"})
+
+	service.CreateSoftlink(app1, app2)
+
+	service.ChangeDateSpaceState(*app1, model.Closed)
 
 	app, err := db.GetApp("ns1", "app1")
 

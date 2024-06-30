@@ -1,6 +1,6 @@
 package model
 
-type Hardlink struct {
+type Softlink struct {
 	ApplicationID string
 	DataSpaceID   string
 }
