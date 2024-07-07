@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"projekat/model"
@@ -21,10 +22,10 @@ const (
 	//dataspace/applicationid/dataspaceid
 	dataSpaceKey = "dataspace/%s/%s"
 
-	//dataspaceitem/path/dataspaceitemid
+	//dataspaceitem/path/name
 	dataSpaceItemKey = "dataspaceitem/%s/%s"
 
-	//hardlink/namespaceid/applicationid/dataspaceitemid
+	//hardlink/applicationid/dataspaceitemid
 	hardlinkKey = "hardlink/%s/%s"
 	//softlink/dataspaceid/applicationid
 	softlinkKey = "softlink/%s/%s"
@@ -99,8 +100,7 @@ func (db *DB) PutDataSpaceItem(dataSpaceItem *model.DataSpaceItem) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	path := fmt.Sprintf("%s/%s", dataSpaceItem.Path, dataSpaceItem.Name)
-	key := key(path, dataSpaceItem.DataSpaceItemId, dataSpaceItemKey)
+	key := key(dataSpaceItem.Path, dataSpaceItem.Name, dataSpaceItemKey)
 
 	jsonData, err := json.Marshal(dataSpaceItem)
 	if err != nil {
@@ -184,12 +184,31 @@ func (db *DB) GetDataSpace(applicationID string, dataSpaceId string) (*model.Dat
 	return &ds, nil
 }
 
+func (db *DB) GetDataSpaceItem(path string) (*model.DataSpaceItem, error) {
+	resp, err := db.Kv.Get(context.Background(), "dataspaceitem/"+path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Kvs) == 0 {
+		return nil, errors.New("no data found for the given key")
+	}
+
+	var dsi model.DataSpaceItem
+	err = json.Unmarshal(resp.Kvs[0].Value, &dsi)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dsi, nil
+}
+
 func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
 	prefix := "softlink/" + dataSpaceId
 
 	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {
-		log.Fatalf("Failed to get data from etcd: %v", err)
+		return err
 	}
 
 	ops := []clientv3.Op{}

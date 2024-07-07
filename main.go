@@ -27,7 +27,7 @@ func main() {
 
 	app2, _ := service.RunApplication("app2", "ns2", 100)
 
-	service.CreateDataItem(app1, &model.DataSpaceItem{DataSpaceItemId: "dsi", Path: "", Name: "fajl"})
+	service.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl"})
 
 	service.CreateSoftlink(app1, app2)
 
