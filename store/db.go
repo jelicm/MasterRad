@@ -229,3 +229,37 @@ func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
 
 	return nil
 }
+
+func (db *DB) GetAllAppsForNamespace(namespaceId string) ([]model.Application, error) {
+	prefix := "application/" + namespaceId
+
+	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+	var applications []model.Application
+	for _, kv := range resp.Kvs {
+		var app model.Application
+		err = json.Unmarshal(kv.Value, &app)
+		if err != nil {
+			return nil, err
+		}
+		applications = append(applications, app)
+	}
+	return applications, nil
+}
+
+func (db *DB) GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, error) {
+	prefix := "dataspaceitem/" + dataSpaceId
+	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+	var itemsPaths []string
+	for _, kv := range resp.Kvs {
+		itemsPaths = append(itemsPaths, string(kv.Key))
+	}
+
+	return itemsPaths, nil
+
+}

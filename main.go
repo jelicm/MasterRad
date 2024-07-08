@@ -21,17 +21,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	service := service.NewApplicationService(db)
+	appservice := service.NewApplicationService(db)
+	nsService := service.NewNamespaceService(db)
 
-	app1, _ := service.RunApplication("app1", "ns1", 25)
+	app1, _ := appservice.RunApplication("app1", "ns1", 25)
 
-	app2, _ := service.RunApplication("app2", "ns2", 100)
+	app2, _ := appservice.RunApplication("app2", "ns2", 100)
 
-	service.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl"})
+	appservice.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl"})
 
-	service.CreateSoftlink(app1, app2)
+	appservice.CreateSoftlink(app1, app2)
 
-	service.ChangeDateSpaceState(*app1, model.Closed)
+	appservice.ChangeDateSpaceState(*app1, model.Closed)
 
 	app, err := db.GetApp("ns1", "app1")
 
@@ -40,5 +41,9 @@ func main() {
 	}
 
 	fmt.Println(app.ApplicationId)
+	items := nsService.RunDataDiscovery("ns2")
+	for _, item := range items {
+		fmt.Println(item)
+	}
 
 }

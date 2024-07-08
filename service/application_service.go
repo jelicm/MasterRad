@@ -63,43 +63,32 @@ func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *m
 	//treba neka validacija za root name, tj ili zabraniti da bude name root ako nije root, ili neka drugačija provera
 	if dsi.Name != "Root" {
 		dsiParent, err := service.store.GetDataSpaceItem(dsi.Path)
-		if err != nil {
-			log.Fatal(err)
-		}
+		evaluateError(err)
+
 		if dsiParent.IsLeaf {
 			dsiParent.IsLeaf = false
 			err = service.store.PutDataSpaceItem(dsiParent)
-			if err != nil {
-				log.Fatal(err)
-			}
+			evaluateError(err)
 		}
 	}
 
 	err := service.store.PutDataSpaceItem(dsi)
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
 func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application) {
 
 	app1, err := service.store.GetApp(app1.ParentNamespaceId, app1.ApplicationId)
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
 
 	ds, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
 
 	//ako je root list, znači nema podataka u tom dataspace-u
 	root, err := service.store.GetDataSpaceItem(ds.Root)
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
+
 	if root.IsLeaf {
 		log.Fatal("There is no available data!")
 	}
@@ -113,9 +102,7 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application)
 		DataSpaceID:   ds.DataSpaceId,
 	}
 	err = service.store.PutSoftlink(&softlink)
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
 
 }
 
@@ -127,9 +114,8 @@ func (service *ApplicationService) ChangeDateSpaceState(app model.Application, s
 	ds.State = state
 
 	err := service.store.PutDataSpace(app.ApplicationId, ds)
-	if err != nil {
-		log.Fatal(err)
-	}
+	evaluateError(err)
+
 	fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
 
 	//ako se promeni na closed, treba obrisati sve softlinkove
