@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
+	"projekat/handler"
 	"projekat/model"
 	"projekat/service"
 	"projekat/store"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -45,5 +49,17 @@ func main() {
 	for _, item := range items {
 		fmt.Println(item)
 	}
+
+	appHandler := handler.NewAppHandler(appservice)
+
+	r := mux.NewRouter()
+
+	r.HandleFunc("/runApp", appHandler.RunApp).Methods("POST")
+
+	srv := &http.Server{
+		Handler: r,
+		Addr:    ":8001",
+	}
+	log.Fatal(srv.ListenAndServe())
 
 }
