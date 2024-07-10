@@ -12,4 +12,5 @@ type Store interface {
 	DeleteAllSoftlinksForDataSpace(dataSpaceId string) error
 	GetAllAppsForNamespace(namespaceId string) ([]Application, error)
 	GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, error)
+	DeleteAppDefault(app *Application) error
 }

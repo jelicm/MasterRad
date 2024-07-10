@@ -32,6 +32,14 @@ func (service *NamespaceService) RunDataDiscovery(namespaceId string) []string {
 	return dataItems
 }
 
+func (service *NamespaceService) DeleteAppDefault(nsId, appId string) {
+	// default brisanje - brišemo i app i ds zajedno
+	app, err := service.store.GetApp(nsId, appId)
+	evaluateError(err)
+	err = service.store.DeleteAppDefault(app)
+	evaluateError(err)
+}
+
 func evaluateError(err error) {
 	if err != nil {
 		log.Fatal(err)

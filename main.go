@@ -50,12 +50,14 @@ func main() {
 		fmt.Println(item)
 	}
 
-	appHandler := handler.NewAppHandler(appservice)
+	appHandler := handler.NewAppHandler(appservice, nsService)
+
+	nsService.DeleteAppDefault("ns1", "app1")
 
 	r := mux.NewRouter()
 
 	r.HandleFunc("/runApp", appHandler.RunApp).Methods("POST")
-
+	r.HandleFunc("/dataDiscovery/{nsId}", appHandler.RunDataDiscovery).Methods("GET")
 	srv := &http.Server{
 		Handler: r,
 		Addr:    ":8001",

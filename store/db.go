@@ -261,5 +261,17 @@ func (db *DB) GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, er
 	}
 
 	return itemsPaths, nil
+}
 
+func (db *DB) DeleteAppDefault(app *model.Application) error {
+	ops := []clientv3.Op{}
+	ops = append(ops, clientv3.OpDelete(key(app.ParentNamespaceId, app.ApplicationId, applicationKey)))
+	ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, app.DataSpaceId, dataSpaceKey)))
+
+	_, err := db.Kv.Txn(context.Background()).Then(ops...).Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
