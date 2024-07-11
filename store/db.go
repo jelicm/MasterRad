@@ -22,11 +22,12 @@ const (
 	//dataspace/applicationid/dataspaceid
 	dataSpaceKey = "dataspace/%s/%s"
 
-	//dataspaceitem/path/name
+	//dataspaceitem/path/name -> dataspaceID/Root/...
 	dataSpaceItemKey = "dataspaceitem/%s/%s"
 
 	//hardlink/applicationid/dataspaceitemid
 	hardlinkKey = "hardlink/%s/%s"
+
 	//softlink/dataspaceid/applicationid
 	softlinkKey = "softlink/%s/%s"
 )
@@ -69,6 +70,23 @@ func (db *DB) PutApp(app *model.Application) error {
 	key := key(app.ParentNamespaceId, app.ApplicationId, applicationKey)
 
 	jsonData, err := json.Marshal(app)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Kv.Put(ctx, key, string(jsonData))
+
+	return err
+
+}
+
+func (db *DB) PutNamespace(namespace *model.Namsespace) error {
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+
+	key := key_ns(namespace.Id, namespaceKey)
+
+	jsonData, err := json.Marshal(namespace)
 	if err != nil {
 		return err
 	}
@@ -152,7 +170,7 @@ func (db *DB) GetApp(namespaceID, appID string) (*model.Application, error) {
 	}
 
 	if len(resp.Kvs) == 0 {
-		log.Fatalf("No data found for the key")
+		log.Fatalf("No data found for the key -app")
 	}
 
 	var app model.Application
@@ -164,6 +182,26 @@ func (db *DB) GetApp(namespaceID, appID string) (*model.Application, error) {
 	return &app, nil
 }
 
+func (db *DB) GetNamespace(namespaceID string) (*model.Namsespace, error) {
+	key := key_ns(namespaceID, namespaceKey)
+	resp, err := db.Kv.Get(context.Background(), key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Kvs) == 0 {
+		log.Fatalf("No data found for the key -ns")
+	}
+
+	var ns model.Namsespace
+	err = json.Unmarshal(resp.Kvs[0].Value, &ns)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ns, nil
+}
+
 func (db *DB) GetDataSpace(applicationID string, dataSpaceId string) (*model.DataSpace, error) {
 	key := key(applicationID, dataSpaceId, dataSpaceKey)
 	resp, err := db.Kv.Get(context.Background(), key)
@@ -172,7 +210,7 @@ func (db *DB) GetDataSpace(applicationID string, dataSpaceId string) (*model.Dat
 	}
 
 	if len(resp.Kvs) == 0 {
-		log.Fatalf("No data found for the key")
+		log.Fatalf("No data found for the key - ds")
 	}
 
 	var ds model.DataSpace
@@ -266,7 +304,9 @@ func (db *DB) GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, er
 func (db *DB) DeleteAppDefault(app *model.Application) error {
 	ops := []clientv3.Op{}
 	ops = append(ops, clientv3.OpDelete(key(app.ParentNamespaceId, app.ApplicationId, applicationKey)))
-	ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, app.DataSpaceId, dataSpaceKey)))
+	for _, dsID := range app.DataSpaceId {
+		ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, dsID, dataSpaceKey)))
+	}
 
 	_, err := db.Kv.Txn(context.Background()).Then(ops...).Commit()
 	if err != nil {

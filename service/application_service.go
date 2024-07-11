@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"projekat/model"
+	"strings"
 )
 
 type ApplicationService struct {
@@ -20,7 +21,8 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	app := model.Application{
 		ApplicationId:     applicationId,
 		ParentNamespaceId: parentNamespaceId,
-		DataSpaceId:       applicationId,
+		DataSpaceId:       []string{applicationId},
+		FreeSpaceKB:       sizeKB / 2,
 	}
 
 	err := service.store.PutApp(&app)
@@ -30,15 +32,16 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 		return nil, err
 	}
 	fmt.Printf("ApplicationId: %s, ParentNamespaceId: %s\n", app.ApplicationId, app.ParentNamespaceId)
-	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, IsLeaf: true}
+	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, SizeKB: 1, IsLeaf: true}
 	ds := model.DataSpace{
 		DataSpaceId: app.ApplicationId,
-		SizeKB:      sizeKB,
+		SizeKB:      sizeKB / 2,
+		UsedKB:      0,
 		State:       model.Open,
 		Root:        root.Path + "/" + root.Name,
 	}
 
-	service.CreateDataItem(&app, &root)
+	service.CreateDataItem(&app, &root, true)
 
 	err = service.store.PutDataSpace(app.ApplicationId, &ds)
 	if err != nil {
@@ -59,9 +62,21 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	return &app, nil
 }
 
-func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *model.DataSpaceItem) {
+func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *model.DataSpaceItem, root bool) {
 	//treba neka validacija za root name, tj ili zabraniti da bude name root ako nije root, ili neka drugačija provera
-	if dsi.Name != "Root" {
+
+	if !root {
+		ds, err := service.store.GetDataSpace(app.ApplicationId, strings.Split(dsi.Path, "/")[0])
+		evaluateError(err)
+
+		if ds.UsedKB+dsi.SizeKB > ds.SizeKB {
+			log.Fatal("cannot add dataitem - no available resources")
+		}
+
+		ds.UsedKB += dsi.SizeKB
+		err = service.store.PutDataSpace(app.ApplicationId, ds)
+		evaluateError(err)
+
 		dsiParent, err := service.store.GetDataSpaceItem(dsi.Path)
 		evaluateError(err)
 
@@ -71,18 +86,19 @@ func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *m
 			evaluateError(err)
 		}
 	}
+	//transakcija?
 
 	err := service.store.PutDataSpaceItem(dsi)
 	evaluateError(err)
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application) {
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, index int) {
 
 	app1, err := service.store.GetApp(app1.ParentNamespaceId, app1.ApplicationId)
 	evaluateError(err)
 
-	ds, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
+	ds, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId[index])
 	evaluateError(err)
 
 	//ako je root list, znači nema podataka u tom dataspace-u
@@ -110,18 +126,20 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application)
 
 func (service *ApplicationService) ChangeDateSpaceState(app model.Application, state model.State) {
 
-	ds, _ := service.store.GetDataSpace(app.ApplicationId, app.DataSpaceId)
-	ds.State = state
+	for _, dsID := range app.DataSpaceId {
+		ds, _ := service.store.GetDataSpace(app.ApplicationId, dsID)
+		ds.State = state
 
-	err := service.store.PutDataSpace(app.ApplicationId, ds)
-	evaluateError(err)
+		err := service.store.PutDataSpace(app.ApplicationId, ds)
+		evaluateError(err)
 
-	fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
+		fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
 
-	//ako se promeni na closed, treba obrisati sve softlinkove
+		//ako se promeni na closed, treba obrisati sve softlinkove
 
-	if state == model.Closed {
-		service.store.DeleteAllSoftlinksForDataSpace(ds.DataSpaceId)
+		if state == model.Closed {
+			service.store.DeleteAllSoftlinksForDataSpace(ds.DataSpaceId)
+		}
 	}
 
 }

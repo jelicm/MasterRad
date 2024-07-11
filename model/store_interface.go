@@ -13,4 +13,5 @@ type Store interface {
 	GetAllAppsForNamespace(namespaceId string) ([]Application, error)
 	GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, error)
 	DeleteAppDefault(app *Application) error
+	GetNamespace(namespaceID string) (*Namsespace, error)
 }

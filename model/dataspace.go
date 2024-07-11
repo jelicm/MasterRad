@@ -18,6 +18,7 @@ type DataSpaceItem struct {
 type DataSpace struct {
 	DataSpaceId string `json:"dataSpaceId"`
 	SizeKB      int    `json:"sizeKB"`
+	UsedKB      int    `json:"usedKB"`
 	State       State  `json:"state"`
 	Root        string `json:"root"`
 }
