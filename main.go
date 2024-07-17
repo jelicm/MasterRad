@@ -32,11 +32,11 @@ func main() {
 
 	app2, _ := appservice.RunApplication("app2", "ns2", 100)
 
-	appservice.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl", SizeKB: 1}, false)
+	appservice.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl", SizeKB: 1}, "nekasema", false)
 
-	appservice.CreateSoftlink(app1, app2, 0)
+	appservice.CreateSoftlink(app1, app2)
 
-	appservice.ChangeDateSpaceState(*app1, model.Closed)
+	//appservice.ChangeDateSpaceState(*app1, model.Closed)
 
 	app, err := db.GetApp("ns1", "app1")
 
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	fmt.Println(app.ApplicationId)
-	items := nsService.RunDataDiscovery("ns2")
+	items := nsService.RunDataDiscovery("ns1")
 	for _, item := range items {
 		fmt.Println(item)
 	}

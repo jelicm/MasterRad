@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"projekat/service"
@@ -49,6 +50,7 @@ func (handler *AppHandler) RunDataDiscovery(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	items := handler.nsservice.RunDataDiscovery(nsID)
+	fmt.Println(nsID)
 	jsonResponse(items, w)
 
 }
