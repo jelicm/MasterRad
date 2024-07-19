@@ -153,7 +153,7 @@ func (db *DB) PutSoftlink(softlink *model.Softlink) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	key := key(softlink.DataSpaceID, softlink.ApplicationID, softlinkKey)
+	key := key(softlink.DataSpaceItemPath, softlink.ApplicationID, softlinkKey)
 
 	jsonData, err := json.Marshal(softlink)
 	if err != nil {
@@ -272,19 +272,23 @@ func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
 }
 
 func (db *DB) GetAllAppsForNamespace(namespaceId string) ([]model.Application, error) {
-	prefix := "application/" + namespaceId
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
 
-	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	prefix := "application/" + namespaceId
+	resp, err := db.Kv.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 	var applications []model.Application
+
 	for _, kv := range resp.Kvs {
 		var app model.Application
 		err = json.Unmarshal(kv.Value, &app)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(app.ApplicationId)
 		applications = append(applications, app)
 	}
 	return applications, nil

@@ -17,7 +17,6 @@ func NewNamespaceService(store model.Store) *NamespaceService {
 }
 
 func (service *NamespaceService) RunDataDiscovery(namespaceId string) []string {
-	fmt.Println(namespaceId == "ns1")
 	apps, err := service.store.GetAllAppsForNamespace(namespaceId)
 	evaluateError(err)
 	fmt.Println(len(apps))
@@ -27,6 +26,7 @@ func (service *NamespaceService) RunDataDiscovery(namespaceId string) []string {
 
 		ds, err := service.store.GetDataSpace(app.ApplicationId, app.DataSpaceId)
 		evaluateError(err)
+		fmt.Println(len(ds.OpenItems))
 		itemsPaths, err := service.store.GetAllSchemes(ds.OpenItems)
 		evaluateError(err)
 		dataItems = append(dataItems, itemsPaths...)
@@ -36,12 +36,17 @@ func (service *NamespaceService) RunDataDiscovery(namespaceId string) []string {
 	return dataItems
 }
 
-func (service *NamespaceService) DeleteAppDefault(nsId, appId string) {
+func (service *NamespaceService) DeleteAppDefault(nsId, appId string) error {
 	// default brisanje - brišemo i app i ds zajedno
 	app, err := service.store.GetApp(nsId, appId)
-	evaluateError(err)
+	if err != nil {
+		return err
+	}
 	err = service.store.DeleteAppDefault(app)
-	evaluateError(err)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func evaluateError(err error) {

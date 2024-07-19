@@ -41,7 +41,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 		OpenItems:   []string{},
 	}
 
-	service.CreateDataItem(&app, &root, "", true)
+	service.CreateDataItem(app.ApplicationId, &root, "", true)
 
 	err = service.store.PutDataSpace(app.ApplicationId, &ds)
 	if err != nil {
@@ -62,15 +62,19 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	return &app, nil
 }
 
-func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *model.DataSpaceItem, scheme string, root bool) {
+func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataSpaceItem, scheme string, root bool) (*model.DataSpaceItem, error) {
 	//treba neka validacija za root name, tj ili zabraniti da bude name root ako nije root, ili neka drugačija provera
 
 	if !root {
-		ds, err := service.store.GetDataSpace(app.ApplicationId, strings.Split(dsi.Path, "/")[0])
-		evaluateError(err)
+		ds, err := service.store.GetDataSpace(appID, strings.Split(dsi.Path, "/")[0])
+		if err != nil {
+			return nil, err
+		}
 
 		dsiParent, err := service.store.GetDataSpaceItem(dsi.Path)
-		evaluateError(err)
+		if err != nil {
+			return nil, err
+		}
 
 		//ignorisemo state ako je poslao korisnik jer roditelj ima vece privilegije
 		if dsiParent.State != model.Mix {
@@ -89,23 +93,34 @@ func (service *ApplicationService) CreateDataItem(app *model.Application, dsi *m
 		}
 
 		ds.UsedKB += dsi.SizeKB
-		err = service.store.PutDataSpace(app.ApplicationId, ds)
-		evaluateError(err)
+		err = service.store.PutDataSpace(appID, ds)
+		if err != nil {
+			return nil, err
+		}
 
 		if dsiParent.IsLeaf {
 			dsiParent.IsLeaf = false
 			err = service.store.PutDataSpaceItem(dsiParent)
-			evaluateError(err)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	//transakcija?
 
 	if dsi.Scheme {
 		err := service.store.PutScheme(dsi.Path+"/"+dsi.Name, scheme)
-		evaluateError(err)
+		if err != nil {
+			return nil, err
+		}
 	}
 	err := service.store.PutDataSpaceItem(dsi)
-	evaluateError(err)
+	if err != nil {
+		return nil, err
+	}
+
+	return dsi, nil
+
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
@@ -126,8 +141,8 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application)
 	}
 
 	softlink := model.Softlink{
-		ApplicationID: app2.ApplicationId,
-		DataSpaceID:   ds.DataSpaceId,
+		ApplicationID:     app2.ApplicationId,
+		DataSpaceItemPath: ds.DataSpaceId,
 	}
 	err = service.store.PutSoftlink(&softlink)
 	evaluateError(err)

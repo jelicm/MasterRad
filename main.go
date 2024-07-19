@@ -32,7 +32,7 @@ func main() {
 
 	app2, _ := appservice.RunApplication("app2", "ns2", 100)
 
-	appservice.CreateDataItem(app1, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl", SizeKB: 1}, "nekasema", false)
+	appservice.CreateDataItem(app1.ApplicationId, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl", SizeKB: 1}, "nekasema", false)
 
 	appservice.CreateSoftlink(app1, app2)
 
@@ -58,6 +58,8 @@ func main() {
 
 	r.HandleFunc("/runApp", appHandler.RunApp).Methods("POST")
 	r.HandleFunc("/dataDiscovery/{nsId}", appHandler.RunDataDiscovery).Methods("GET")
+	r.HandleFunc("/addDataItem", appHandler.AddDataItem).Methods("POST")
+	r.HandleFunc("/deleteApp", appHandler.DeleteApp).Methods("DELETE")
 	srv := &http.Server{
 		Handler: r,
 		Addr:    ":8001",
