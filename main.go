@@ -12,6 +12,7 @@ import (
 	"projekat/store"
 
 	"github.com/gorilla/mux"
+	"github.com/nats-io/nats.go"
 )
 
 func main() {
@@ -19,22 +20,25 @@ func main() {
 	endpoints := []string{"localhost:2379"}
 	timeout := 5 * time.Second
 
+	conn := Conn()
+	defer conn.Close()
+
 	db, err := store.New(endpoints, timeout)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	appservice := service.NewApplicationService(db)
+	appservice := service.NewApplicationService(db, conn)
 	nsService := service.NewNamespaceService(db)
 
 	app1, _ := appservice.RunApplication("app1", "ns1", 25)
 
-	app2, _ := appservice.RunApplication("app2", "ns2", 100)
+	//app2, _ := appservice.RunApplication("app2", "ns2", 100)
 
 	appservice.CreateDataItem(app1.ApplicationId, &model.DataSpaceItem{Path: "app1/Root", Name: "fajl", SizeKB: 1}, "nekasema", false)
 
-	appservice.CreateSoftlink(app1, app2)
+	//appservice.CreateSoftlink(app1, app2)
 
 	//appservice.ChangeDateSpaceState(*app1, model.Closed)
 
@@ -60,10 +64,20 @@ func main() {
 	r.HandleFunc("/dataDiscovery/{nsId}", appHandler.RunDataDiscovery).Methods("GET")
 	r.HandleFunc("/addDataItem", appHandler.AddDataItem).Methods("POST")
 	r.HandleFunc("/deleteApp", appHandler.DeleteApp).Methods("DELETE")
+	r.HandleFunc("/softlink", appHandler.CreateSoftlink).Methods("POST")
+
 	srv := &http.Server{
 		Handler: r,
 		Addr:    ":8001",
 	}
 	log.Fatal(srv.ListenAndServe())
 
+}
+
+func Conn() *nats.Conn {
+	conn, err := nats.Connect("nats://localhost:4222")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return conn
 }

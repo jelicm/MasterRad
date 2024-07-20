@@ -5,15 +5,19 @@ import (
 	"log"
 	"projekat/model"
 	"strings"
+
+	"github.com/nats-io/nats.go"
 )
 
 type ApplicationService struct {
 	store model.Store
+	conn  *nats.Conn
 }
 
-func NewApplicationService(store model.Store) *ApplicationService {
+func NewApplicationService(store model.Store, conn *nats.Conn) *ApplicationService {
 	return &ApplicationService{
 		store: store,
+		conn:  conn,
 	}
 }
 
@@ -124,29 +128,38 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application) {
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string) (*string, error) {
+	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
+	if err != nil {
+		return nil, err
+	}
+	if app1.ParentNamespaceId != app2.ParentNamespaceId && dsi.Permissions[8] != 's' {
+		//nije isti rns i others nema prava pristupa
+		return nil, fmt.Errorf("no privilages for this data - others")
+	}
 
-	app1, err := service.store.GetApp(app1.ParentNamespaceId, app1.ApplicationId)
-	evaluateError(err)
-
-	ds, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
-	evaluateError(err)
-
-	//ako je root list, znači nema podataka u tom dataspace-u
-	root, err := service.store.GetDataSpaceItem(ds.Root)
-	evaluateError(err)
-
-	if root.IsLeaf {
-		log.Fatal("There is no available data!")
+	if app1.ParentNamespaceId == app2.ParentNamespaceId && dsi.Permissions[5] != 's' {
+		//group nema dobre privilegije
+		return nil, fmt.Errorf("no privilages for this data - group")
 	}
 
 	softlink := model.Softlink{
+		SoftlinkID:        app2.ApplicationId + "+" + dataSpaceItemPath,
 		ApplicationID:     app2.ApplicationId,
-		DataSpaceItemPath: ds.DataSpaceId,
+		DataSpaceItemPath: dataSpaceItemPath,
 	}
 	err = service.store.PutSoftlink(&softlink)
-	evaluateError(err)
+	if err != nil {
+		return nil, err
+	}
 
+	_, err = service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
+		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &softlink.SoftlinkID, nil
 }
 
 //da li mi uopste treba struktura hl?
