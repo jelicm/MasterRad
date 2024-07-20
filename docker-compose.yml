@@ -1,0 +1,23 @@
+version:  "3.8"
+
+services:
+  nats:
+    image: 'nats:latest'
+    expose:
+      - "4222"
+    ports:
+      - "4222:4222"
+  etcd:
+    image: 'bitnami/etcd:latest'
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - 2379:2379
+      - 2380:2380
+    networks:
+      - master
+
+networks:
+  master:
+    driver: bridge
