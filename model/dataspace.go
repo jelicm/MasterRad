@@ -5,20 +5,23 @@ type State int
 const (
 	Open State = iota
 	Closed
+	Mix
 )
 
 type DataSpaceItem struct {
 	Path        string `json:"path"`
-	SizeKB      int    `json:"sizeKb"`
 	Name        string `json:"name"`
-	DataSpaceId string `json:"appID"`
+	SizeKB      int    `json:"sizeKb"`
+	State       State  `json:"state"`
+	Scheme      bool   `json:"scheme"`
+	Permissions string `json:"permissions"`
 	IsLeaf      bool   `json:"isLeaf"`
 }
 
 type DataSpace struct {
-	DataSpaceId string `json:"dataSpaceId"`
-	SizeKB      int    `json:"sizeKB"`
-	UsedKB      int    `json:"usedKB"`
-	State       State  `json:"state"`
-	Root        string `json:"root"`
+	DataSpaceId string   `json:"dataSpaceId"`
+	SizeKB      int      `json:"sizeKB"`
+	UsedKB      int      `json:"usedKB"`
+	Root        string   `json:"root"`
+	OpenItems   []string `json:"openItems"`
 }

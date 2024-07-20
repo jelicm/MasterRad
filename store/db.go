@@ -16,6 +16,9 @@ const (
 	//namespace/namespaceid
 	namespaceKey = "namespace/%s"
 
+	//scheme/pathToDSI
+	schemeKey = "scheme/%s"
+
 	//application/namespaceId/applicationId
 	applicationKey = "application/%s/%s"
 
@@ -32,7 +35,7 @@ const (
 	softlinkKey = "softlink/%s/%s"
 )
 
-func key_ns(id, template string) string {
+func key_one(id, template string) string {
 	return fmt.Sprintf(template, id)
 }
 
@@ -84,7 +87,7 @@ func (db *DB) PutNamespace(namespace *model.Namsespace) error {
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
 
-	key := key_ns(namespace.Id, namespaceKey)
+	key := key_one(namespace.Id, namespaceKey)
 
 	jsonData, err := json.Marshal(namespace)
 	if err != nil {
@@ -150,7 +153,7 @@ func (db *DB) PutSoftlink(softlink *model.Softlink) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	key := key(softlink.DataSpaceID, softlink.ApplicationID, softlinkKey)
+	key := key(softlink.DataSpaceItemPath, softlink.ApplicationID, softlinkKey)
 
 	jsonData, err := json.Marshal(softlink)
 	if err != nil {
@@ -183,7 +186,7 @@ func (db *DB) GetApp(namespaceID, appID string) (*model.Application, error) {
 }
 
 func (db *DB) GetNamespace(namespaceID string) (*model.Namsespace, error) {
-	key := key_ns(namespaceID, namespaceKey)
+	key := key_one(namespaceID, namespaceKey)
 	resp, err := db.Kv.Get(context.Background(), key)
 	if err != nil {
 		return nil, err
@@ -269,19 +272,23 @@ func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
 }
 
 func (db *DB) GetAllAppsForNamespace(namespaceId string) ([]model.Application, error) {
-	prefix := "application/" + namespaceId
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
 
-	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	prefix := "application/" + namespaceId
+	resp, err := db.Kv.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 	var applications []model.Application
+
 	for _, kv := range resp.Kvs {
 		var app model.Application
 		err = json.Unmarshal(kv.Value, &app)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(app.ApplicationId)
 		applications = append(applications, app)
 	}
 	return applications, nil
@@ -304,9 +311,7 @@ func (db *DB) GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, er
 func (db *DB) DeleteAppDefault(app *model.Application) error {
 	ops := []clientv3.Op{}
 	ops = append(ops, clientv3.OpDelete(key(app.ParentNamespaceId, app.ApplicationId, applicationKey)))
-	for _, dsID := range app.DataSpaceId {
-		ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, dsID, dataSpaceKey)))
-	}
+	ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, app.DataSpaceId, dataSpaceKey)))
 
 	_, err := db.Kv.Txn(context.Background()).Then(ops...).Commit()
 	if err != nil {
@@ -314,4 +319,36 @@ func (db *DB) DeleteAppDefault(app *model.Application) error {
 	}
 
 	return nil
+}
+
+func (db *DB) PutScheme(path string, scheme string) error {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+	key := key_one(path, schemeKey)
+
+	_, err := db.Kv.Put(ctx, key, scheme)
+
+	return err
+}
+
+func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+	var schemeValues []string
+	for _, scheme := range schemes {
+		key := key_one(scheme, schemeKey)
+		resp, err := db.Kv.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(resp.Kvs) == 0 {
+			log.Fatalf("No data found for the key -dd")
+		}
+		schemeValues = append(schemeValues, string(resp.Kvs[0].Value))
+	}
+
+	return schemeValues, nil
 }

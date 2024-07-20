@@ -1,6 +1,7 @@
 package model
 
 type Softlink struct {
-	ApplicationID string
-	DataSpaceID   string
+	SoftlinkID        string `json:"softlinkID"`
+	ApplicationID     string `json:"appID"`
+	DataSpaceItemPath string `json:"path"`
 }
