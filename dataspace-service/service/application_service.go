@@ -1,8 +1,12 @@
 package service
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"projekat/model"
 	"strings"
 
@@ -128,7 +132,7 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string) (*string, error) {
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string) (*string, error) {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	if err != nil {
 		return nil, err
@@ -138,28 +142,107 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		return nil, fmt.Errorf("no privilages for this data - others")
 	}
 
+	if app1.ParentNamespaceId != app2.ParentNamespaceId && dsi.Permissions[9] != 'x' {
+		//ako nema permisije, onda idu prazni stringovi
+		storedProcedurePath = ""
+		jsonParams = ""
+	}
+
 	if app1.ParentNamespaceId == app2.ParentNamespaceId && dsi.Permissions[5] != 's' {
 		//group nema dobre privilegije
 		return nil, fmt.Errorf("no privilages for this data - group")
 	}
 
+	if app1.ParentNamespaceId == app2.ParentNamespaceId && dsi.Permissions[6] != 'x' {
+		//ako nema permisije, onda idu prazni stringovi
+		storedProcedurePath = ""
+		jsonParams = ""
+	}
+
 	softlink := model.Softlink{
-		SoftlinkID:        app2.ApplicationId + "+" + dataSpaceItemPath,
-		ApplicationID:     app2.ApplicationId,
-		DataSpaceItemPath: dataSpaceItemPath,
+		SoftlinkID:          app2.ApplicationId + "+" + dataSpaceItemPath,
+		ApplicationID:       app2.ApplicationId,
+		DataSpaceItemPath:   dataSpaceItemPath,
+		StoredProcedurePath: storedProcedurePath,
+		JsonParameters:      jsonParams,
 	}
 	err = service.store.PutSoftlink(&softlink)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
-		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
-	})
+	err = service.createTopicForSoftLink(softlink)
 	if err != nil {
 		return nil, err
 	}
 	return &softlink.SoftlinkID, nil
+}
+
+func (service ApplicationService) createTopicForSoftLink(softlink model.Softlink) error {
+
+	_, err := service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
+		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
+
+		if softlink.StoredProcedurePath == "" {
+			fmt.Println("nema path-a")
+			return
+		}
+
+		url := softlink.StoredProcedurePath
+
+		if softlink.JsonParameters == "" {
+			resp, err := http.Get(url)
+			if err != nil {
+				fmt.Println("Error making GET request:", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Println("Error reading response body:", err)
+				return
+			}
+			fmt.Println("Response:", string(body))
+		} else {
+			if !isValidJSON(softlink.JsonParameters) {
+				//videti ovde za te povratne vrednosti sta zezaju ovi errori
+				fmt.Println("nije validan json")
+				return
+			}
+
+			req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(softlink.JsonParameters)))
+			if err != nil {
+				fmt.Println("Error creating request:", err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("Error sending request:", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			// Read the response body
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Println("Error reading response body:", err)
+				return
+			}
+			fmt.Println("Response:", string(body))
+		}
+
+	})
+
+	return err
+}
+
+func isValidJSON(s string) bool {
+	var js interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
 }
 
 //da li mi uopste treba struktura hl?

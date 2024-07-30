@@ -13,7 +13,7 @@ func main() {
 	conn := Conn()
 	defer conn.Close()
 
-	subject := "app32+app23/Root/file.txt"
+	subject := "app1+app23/Root/file.txt"
 
 	err := conn.Publish(subject, []byte("aaaajo"))
 	if err != nil {

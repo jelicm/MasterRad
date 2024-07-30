@@ -95,7 +95,7 @@ func (handler *AppHandler) DeleteApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResp(nil, http.StatusCreated, w)
+	writeResp(nil, w)
 }
 
 func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +108,7 @@ func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request
 
 	app1 := model.Application{ApplicationId: slDTO.Application1Id, ParentNamespaceId: slDTO.Namespace1Id}
 	app2 := model.Application{ApplicationId: slDTO.Application2Id, ParentNamespaceId: slDTO.Namespace2Id}
-	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataItemPath)
+	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataItemPath, slDTO.StoredProcedurePath, slDTO.JsonParameters)
 
 	if err != nil {
 		log.Println(err)
