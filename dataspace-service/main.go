@@ -17,7 +17,7 @@ import (
 
 func main() {
 
-	endpoints := []string{"localhost:2379"}
+	endpoints := []string{"etcd:2379"}
 	timeout := 5 * time.Second
 
 	conn := Conn()
@@ -75,7 +75,7 @@ func main() {
 }
 
 func Conn() *nats.Conn {
-	conn, err := nats.Connect("nats://localhost:4222")
+	conn, err := nats.Connect("nats://nats:4222")
 	if err != nil {
 		log.Fatal(err)
 	}

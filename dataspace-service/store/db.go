@@ -31,7 +31,7 @@ const (
 	//hardlink/applicationid/dataspaceitemid
 	hardlinkKey = "hardlink/%s/%s"
 
-	//softlink/dataspaceid/applicationid
+	//softlink/dataspaceItemPath/applicationid
 	softlinkKey = "softlink/%s/%s"
 )
 
@@ -244,8 +244,8 @@ func (db *DB) GetDataSpaceItem(path string) (*model.DataSpaceItem, error) {
 	return &dsi, nil
 }
 
-func (db *DB) DeleteAllSoftlinksForDataSpace(dataSpaceId string) error {
-	prefix := "softlink/" + dataSpaceId
+func (db *DB) DeleteAllSoftlinksForDataSpaceItem(dataSpaceItemPath string) error {
+	prefix := "softlink/" + dataSpaceItemPath
 
 	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {

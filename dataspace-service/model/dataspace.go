@@ -18,6 +18,10 @@ type DataSpaceItem struct {
 	IsLeaf      bool   `json:"isLeaf"`
 }
 
+func (dsi DataSpaceItem) GetFullPath() string {
+	return dsi.Path + "/" + dsi.Name
+}
+
 type DataSpace struct {
 	DataSpaceId string   `json:"dataSpaceId"`
 	SizeKB      int      `json:"sizeKB"`

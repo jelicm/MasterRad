@@ -244,25 +244,3 @@ func isValidJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
 }
-
-//da li mi uopste treba struktura hl?
-
-/*func (service *ApplicationService) ChangeDateSpaceState(app model.Application, state model.State) {
-
-	for _, dsID := range app.DataSpaceId {
-		ds, _ := service.store.GetDataSpace(app.ApplicationId, dsID)
-		ds.State = state
-
-		err := service.store.PutDataSpace(app.ApplicationId, ds)
-		evaluateError(err)
-
-		fmt.Printf("DataSpace ds: %d; State %d\n", ds.SizeKB, ds.State)
-
-		//ako se promeni na closed, treba obrisati sve softlinkove
-
-		if state == model.Closed {
-			service.store.DeleteAllSoftlinksForDataSpace(ds.DataSpaceId)
-		}
-	}
-
-}*/

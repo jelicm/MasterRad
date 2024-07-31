@@ -3,18 +3,36 @@ version:  "3.8"
 services:
   nats:
     image: 'nats:latest'
+    container_name: nats
     expose:
       - "4222"
     ports:
       - "4222:4222"
+    networks:
+      - master
   etcd:
     image: 'bitnami/etcd:latest'
+    container_name: etcd
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
     ports:
       - 2379:2379
       - 2380:2380
+    networks:
+      - master
+  service:
+    image: ds_service
+    container_name: ds_service
+    build:
+      context: ./dataspace-service/
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 8001:8001
+    depends_on:
+      - etcd
+      - nats
     networks:
       - master
 

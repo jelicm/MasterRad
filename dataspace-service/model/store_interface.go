@@ -9,7 +9,7 @@ type Store interface {
 	PutDataSpaceItem(dataSpaceItem *DataSpaceItem) error
 	PutHardlink(hardlink *Hardlink) error
 	PutSoftlink(softlink *Softlink) error
-	DeleteAllSoftlinksForDataSpace(dataSpaceId string) error
+	DeleteAllSoftlinksForDataSpaceItem(dataSpaceItemPath string) error
 	GetAllAppsForNamespace(namespaceId string) ([]Application, error)
 	GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, error)
 	DeleteAppDefault(app *Application) error
