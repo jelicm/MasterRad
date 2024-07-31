@@ -16,4 +16,5 @@ type Store interface {
 	GetNamespace(namespaceID string) (*Namsespace, error)
 	PutScheme(path string, scheme string) error
 	GetAllSchemes(schemes []string) ([]string, error)
+	ChangeStateForAllChildren(dataSpaceItemPath string, state State) ([]string, error)
 }

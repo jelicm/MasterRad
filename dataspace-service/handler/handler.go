@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"projekat/model"
@@ -51,7 +50,6 @@ func (handler *AppHandler) RunDataDiscovery(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	items := handler.nsservice.RunDataDiscovery(nsID)
-	fmt.Println(nsID)
 	jsonResponse(items, w)
 
 }
@@ -118,4 +116,23 @@ func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(*rez))
+}
+
+func (handler *AppHandler) ChangeDSIState(w http.ResponseWriter, r *http.Request) {
+	var stateDTO StateDTO
+	err := json.NewDecoder(r.Body).Decode(&stateDTO)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = handler.nsservice.ChangeDSIState(stateDTO.ApplicationId, stateDTO.DataSpaceItemPath, model.State(stateDTO.State))
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("state changed"))
 }

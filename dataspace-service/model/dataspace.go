@@ -5,7 +5,7 @@ type State int
 const (
 	Open State = iota
 	Closed
-	Mix
+	Custom
 )
 
 type DataSpaceItem struct {
@@ -20,6 +20,10 @@ type DataSpaceItem struct {
 
 func (dsi DataSpaceItem) GetFullPath() string {
 	return dsi.Path + "/" + dsi.Name
+}
+
+func (dsi *DataSpaceItem) SetDefaultPermissions() {
+	dsi.Permissions = "-rwx------"
 }
 
 type DataSpace struct {

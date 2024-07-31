@@ -21,20 +21,20 @@ services:
       - 2380:2380
     networks:
       - master
-  service:
-    image: ds_service
-    container_name: ds_service
-    build:
-      context: ./dataspace-service/
-      dockerfile: Dockerfile
-    restart: always
-    ports:
-      - 8001:8001
-    depends_on:
-      - etcd
-      - nats
-    networks:
-      - master
+  #service:
+  #  image: ds_service
+  #  container_name: ds_service
+  #  build:
+  #    context: ./dataspace-service/
+  #    dockerfile: Dockerfile
+  #  restart: always
+  #  ports:
+  #    - 8001:8001
+  #  depends_on:
+  #    - etcd
+  #    - nats
+  #  networks:
+  #    - master
 
 networks:
   master:

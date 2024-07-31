@@ -352,3 +352,40 @@ func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
 
 	return schemeValues, nil
 }
+
+func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.State) ([]string, error) {
+
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+
+	prefix := "dataspaceitem/" + dataSpaceItemPath
+	resp, err := db.Kv.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+	var dsis []string
+	ops := []clientv3.Op{}
+
+	for _, kv := range resp.Kvs {
+		var dsi model.DataSpaceItem
+		err = json.Unmarshal(kv.Value, &dsi)
+		if err != nil {
+			return nil, err
+		}
+		dsi.State = state
+
+		jsonData, err := json.Marshal(dsi)
+		if err != nil {
+			return nil, err
+		}
+		ops = append(ops, clientv3.OpPut(key(dsi.Path, dsi.Name, dataSpaceItemKey), string(jsonData)))
+		dsis = append(dsis, dsi.GetFullPath())
+	}
+
+	_, err = db.Kv.Txn(context.Background()).Then(ops...).Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return dsis, nil
+}

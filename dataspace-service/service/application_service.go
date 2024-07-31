@@ -40,7 +40,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	}
 
 	fmt.Printf("ApplicationId: %s, ParentNamespaceId: %s\n", app.ApplicationId, app.ParentNamespaceId)
-	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, SizeKB: 1, IsLeaf: true, State: model.Mix, Scheme: false}
+	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, SizeKB: 1, IsLeaf: true, State: model.Custom, Scheme: false}
 	ds := model.DataSpace{
 		DataSpaceId: app.ApplicationId,
 		SizeKB:      sizeKB / 2,
@@ -85,15 +85,19 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 		}
 
 		//ignorisemo state ako je poslao korisnik jer roditelj ima vece privilegije
-		if dsiParent.State != model.Mix {
+		if dsiParent.State != model.Custom {
 			dsi.State = dsiParent.State
 		}
 
 		//ovo videti da li je validno i da li treba neka validacija da vrati 400 ako nema seme za open
 		dsi.Scheme = scheme != ""
 
+		if dsi.State != model.Open {
+			dsi.SetDefaultPermissions()
+		}
+
 		if dsi.State == model.Open && dsi.Scheme {
-			ds.OpenItems = append(ds.OpenItems, dsi.Path+"/"+dsi.Name)
+			ds.OpenItems = append(ds.OpenItems, dsi.GetFullPath())
 		}
 
 		if ds.UsedKB+dsi.SizeKB > ds.SizeKB {
