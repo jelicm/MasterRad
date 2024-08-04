@@ -40,6 +40,8 @@ func main() {
 	r.HandleFunc("/deleteApp", appHandler.DeleteApp).Methods("DELETE")
 	r.HandleFunc("/softlink", appHandler.CreateSoftlink).Methods("POST")
 	r.HandleFunc("/changeState", appHandler.ChangeDSIState).Methods("PUT")
+	r.HandleFunc("/changePermissions", appHandler.ChangePermissions).Methods("PUT")
+	r.HandleFunc("/putScheme", appHandler.PutScheme).Methods("PUT")
 
 	srv := &http.Server{
 		Handler: r,

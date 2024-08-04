@@ -126,7 +126,7 @@ func (handler *AppHandler) ChangeDSIState(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = handler.nsservice.ChangeDSIState(stateDTO.ApplicationId, stateDTO.DataSpaceItemPath, model.State(stateDTO.State))
+	err = handler.nsservice.ChangeDSIState(stateDTO.ApplicationId, stateDTO.DataSpaceItemPath, model.State(stateDTO.State), stateDTO.Scheme)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -135,4 +135,42 @@ func (handler *AppHandler) ChangeDSIState(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("state changed"))
+}
+
+func (handler *AppHandler) ChangePermissions(w http.ResponseWriter, r *http.Request) {
+	var permissionsDTO PermissionsDTO
+	err := json.NewDecoder(r.Body).Decode(&permissionsDTO)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = handler.nsservice.ChangePermissions(permissionsDTO.DataSpaceItemPath, permissionsDTO.Permissions)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("permissions changed"))
+}
+
+func (handler *AppHandler) PutScheme(w http.ResponseWriter, r *http.Request) {
+	var schemeDTO SchemeDTO
+	err := json.NewDecoder(r.Body).Decode(&schemeDTO)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = handler.nsservice.PutScheme(schemeDTO.DataSpaceItemPath, schemeDTO.Scheme)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("scheme added"))
 }

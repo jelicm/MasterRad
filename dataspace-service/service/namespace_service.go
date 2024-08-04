@@ -63,7 +63,7 @@ func (service *NamespaceService) DeleteAppDefault(nsId, appId string) error {
 	return nil
 }
 
-func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath string, state model.State) error {
+func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath string, state model.State, scheme string) error {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	if err != nil {
 		return err
@@ -89,14 +89,21 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 	}
 
 	if state == model.Open {
-		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state)
+		if scheme == "" {
+			return fmt.Errorf("no scheme")
+		}
+		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, true)
 		if err != nil {
 			return err
 		}
 		ds.OpenItems = append(ds.OpenItems, children...)
+		for _, child := range children {
+			service.store.PutScheme(child, scheme)
+		}
 		service.store.PutDataSpace(appId, ds)
+
 	} else if state == model.Closed {
-		_, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state)
+		_, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, false)
 		if err != nil {
 			return err
 		}
@@ -122,6 +129,86 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 			}
 		}
 	}
+	return nil
+}
+
+func (service *NamespaceService) PutScheme(dataSpaceItemPath string, scheme string) error {
+	if scheme == "" {
+		return fmt.Errorf("no scheme")
+	}
+	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
+	if err != nil {
+		return err
+	}
+	if !dsi.Scheme {
+		dsi.Scheme = true
+		err = service.store.PutDataSpaceItem(dsi)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = service.store.PutScheme(dataSpaceItemPath, scheme)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *NamespaceService) ChangePermissions(dataSpaceItemPath string, permissions string) error {
+	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
+	if err != nil {
+		return nil
+	}
+
+	dsi.Permissions = permissions
+
+	softlinks, err := service.store.GetAllSoftLinksForDataSpaceItem(dsi.GetFullPath())
+
+	if err != nil {
+		return err
+	}
+
+	var toDelete []model.Softlink
+	for _, sl := range softlinks {
+		if sl.Type == model.Group {
+			if dsi.Permissions[5] != 's' {
+				toDelete = append(toDelete, sl)
+				//ovde dodati neko brisanje sl
+			}
+			if dsi.Permissions[6] != 'x' {
+				sl.StoredProcedurePath = ""
+				sl.JsonParameters = ""
+				service.store.PutSoftlink(&sl)
+			}
+
+		} else if sl.Type == model.Others {
+			if dsi.Permissions[8] != 's' {
+				toDelete = append(toDelete, sl)
+				//ovde dodati neko brisanje sl
+			}
+			if dsi.Permissions[9] != 'x' {
+				sl.StoredProcedurePath = ""
+				sl.JsonParameters = ""
+				service.store.PutSoftlink(&sl)
+			}
+		}
+
+		if len(toDelete) > 0 {
+			err = service.store.DeleteAllSoftlinksFromList(toDelete)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+
+	err = service.store.PutDataSpaceItem(dsi)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

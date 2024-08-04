@@ -1,1 +1,1 @@
-{"schemaVersion":2,"manifests":[{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"sha256:969f4b73fcaa35dfc07601747f82162c120255fcb03542ddbf985b0a224d966f","size":1229,"annotations":{"org.opencontainers.image.ref.name":"latest"}}]}
+{"schemaVersion":2,"manifests":[{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"sha256:39fa4a1f6e79ac7a76dbb687cb74d3a101a1dedeaff84dc36ca084a12188b660","size":1229,"annotations":{"org.opencontainers.image.ref.name":"latest"}}]}

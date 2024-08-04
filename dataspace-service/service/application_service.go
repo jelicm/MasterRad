@@ -138,29 +138,36 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
 func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string) (*string, error) {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
+	sltype := model.Others
+
 	if err != nil {
 		return nil, err
 	}
-	if app1.ParentNamespaceId != app2.ParentNamespaceId && dsi.Permissions[8] != 's' {
+	if app1.ParentNamespaceId != app2.ParentNamespaceId {
 		//nije isti rns i others nema prava pristupa
-		return nil, fmt.Errorf("no privilages for this data - others")
+		if dsi.Permissions[8] != 's' {
+			return nil, fmt.Errorf("no privilages for this data - others")
+		}
+
+		if dsi.Permissions[9] != 'x' {
+			//ako nema permisije, onda idu prazni stringovi
+			storedProcedurePath = ""
+			jsonParams = ""
+		}
 	}
 
-	if app1.ParentNamespaceId != app2.ParentNamespaceId && dsi.Permissions[9] != 'x' {
-		//ako nema permisije, onda idu prazni stringovi
-		storedProcedurePath = ""
-		jsonParams = ""
-	}
+	if app1.ParentNamespaceId == app2.ParentNamespaceId {
+		if dsi.Permissions[5] != 's' {
+			//group nema dobre privilegije
+			return nil, fmt.Errorf("no privilages for this data - group")
+		}
 
-	if app1.ParentNamespaceId == app2.ParentNamespaceId && dsi.Permissions[5] != 's' {
-		//group nema dobre privilegije
-		return nil, fmt.Errorf("no privilages for this data - group")
-	}
+		if dsi.Permissions[6] != 'x' {
+			storedProcedurePath = ""
+			jsonParams = ""
+		}
 
-	if app1.ParentNamespaceId == app2.ParentNamespaceId && dsi.Permissions[6] != 'x' {
-		//ako nema permisije, onda idu prazni stringovi
-		storedProcedurePath = ""
-		jsonParams = ""
+		sltype = model.Group
 	}
 
 	softlink := model.Softlink{
@@ -169,32 +176,39 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		DataSpaceItemPath:   dataSpaceItemPath,
 		StoredProcedurePath: storedProcedurePath,
 		JsonParameters:      jsonParams,
+		Type:                sltype,
 	}
 	err = service.store.PutSoftlink(&softlink)
 	if err != nil {
 		return nil, err
 	}
 
-	err = service.createTopicForSoftLink(softlink)
+	err = service.createTopicForSoftLink(&softlink)
 	if err != nil {
 		return nil, err
 	}
 	return &softlink.SoftlinkID, nil
 }
 
-func (service ApplicationService) createTopicForSoftLink(softlink model.Softlink) error {
+func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softlink) error {
 
 	_, err := service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
 		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
 
-		if softlink.StoredProcedurePath == "" {
+		sl, err := service.store.GetSoftlink(softlink.DataSpaceItemPath, softlink.ApplicationID)
+
+		if err != nil {
+			return
+		}
+
+		if sl.StoredProcedurePath == "" {
 			fmt.Println("nema path-a")
 			return
 		}
 
-		url := softlink.StoredProcedurePath
+		url := sl.StoredProcedurePath
 
-		if softlink.JsonParameters == "" {
+		if sl.JsonParameters == "" {
 			resp, err := http.Get(url)
 			if err != nil {
 				fmt.Println("Error making GET request:", err)
@@ -209,13 +223,13 @@ func (service ApplicationService) createTopicForSoftLink(softlink model.Softlink
 			}
 			fmt.Println("Response:", string(body))
 		} else {
-			if !isValidJSON(softlink.JsonParameters) {
+			if !isValidJSON(sl.JsonParameters) {
 				//videti ovde za te povratne vrednosti sta zezaju ovi errori
 				fmt.Println("nije validan json")
 				return
 			}
 
-			req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(softlink.JsonParameters)))
+			req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(sl.JsonParameters)))
 			if err != nil {
 				fmt.Println("Error creating request:", err)
 				return
@@ -230,7 +244,6 @@ func (service ApplicationService) createTopicForSoftLink(softlink model.Softlink
 			}
 			defer resp.Body.Close()
 
-			// Read the response body
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Println("Error reading response body:", err)

@@ -288,7 +288,6 @@ func (db *DB) GetAllAppsForNamespace(namespaceId string) ([]model.Application, e
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(app.ApplicationId)
 		applications = append(applications, app)
 	}
 	return applications, nil
@@ -333,7 +332,6 @@ func (db *DB) PutScheme(path string, scheme string) error {
 }
 
 func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
-
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
 	var schemeValues []string
@@ -353,7 +351,7 @@ func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
 	return schemeValues, nil
 }
 
-func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.State) ([]string, error) {
+func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.State, scheme bool) ([]string, error) {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
@@ -373,7 +371,9 @@ func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.St
 			return nil, err
 		}
 		dsi.State = state
-
+		if scheme {
+			dsi.Scheme = true
+		}
 		jsonData, err := json.Marshal(dsi)
 		if err != nil {
 			return nil, err
@@ -388,4 +388,67 @@ func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.St
 	}
 
 	return dsis, nil
+}
+
+func (db *DB) GetSoftlink(dsiPath string, appId string) (*model.Softlink, error) {
+	key := key(dsiPath, appId, softlinkKey)
+	resp, err := db.Kv.Get(context.Background(), key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Kvs) == 0 {
+		return nil, errors.New("no softlink for given key")
+	}
+
+	var sl model.Softlink
+	err = json.Unmarshal(resp.Kvs[0].Value, &sl)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sl, nil
+}
+
+func (db *DB) GetAllSoftLinksForDataSpaceItem(dsiPath string) ([]model.Softlink, error) {
+	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cncl()
+
+	prefix := "softlink/" + dsiPath
+	resp, err := db.Kv.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+	var softlinks []model.Softlink
+
+	for _, kv := range resp.Kvs {
+		var sl model.Softlink
+		err = json.Unmarshal(kv.Value, &sl)
+		if err != nil {
+			return nil, err
+		}
+
+		softlinks = append(softlinks, sl)
+	}
+	return softlinks, nil
+}
+
+func (db *DB) DeleteAllSoftlinksFromList(softlinks []model.Softlink) error {
+	ops := []clientv3.Op{}
+
+	for _, sl := range softlinks {
+		ops = append(ops, clientv3.OpDelete(key(sl.DataSpaceItemPath, sl.ApplicationID, softlinkKey)))
+	}
+
+	if len(ops) > 0 {
+		_, err := db.Kv.Txn(context.Background()).Then(ops...).Commit()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deleted %d keys\n", len(ops))
+	} else {
+		fmt.Println("No keys with requested prefix!")
+	}
+
+	return nil
 }
