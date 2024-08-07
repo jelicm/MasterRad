@@ -106,7 +106,7 @@ func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request
 
 	app1 := model.Application{ApplicationId: slDTO.Application1Id, ParentNamespaceId: slDTO.Namespace1Id}
 	app2 := model.Application{ApplicationId: slDTO.Application2Id, ParentNamespaceId: slDTO.Namespace2Id}
-	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataItemPath, slDTO.StoredProcedurePath, slDTO.JsonParameters)
+	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataItemPath, slDTO.StoredProcedurePath, slDTO.JsonParameters, slDTO.TriggerPath, slDTO.EventTopic)
 
 	if err != nil {
 		log.Println(err)

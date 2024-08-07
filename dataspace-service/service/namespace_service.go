@@ -103,7 +103,7 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 		service.store.PutDataSpace(appId, ds)
 
 	} else if state == model.Closed {
-		_, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, false)
+		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, false)
 		if err != nil {
 			return err
 		}
@@ -114,6 +114,24 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 			}
 		}
 		ds.OpenItems = newOpenItems
+		for _, child := range children {
+			sls, err := service.store.GetAllSoftLinksForDataSpaceItem(child)
+			if err != nil {
+				return err
+			}
+			for _, sl := range sls {
+				if sl.TriggerPath != "" && sl.EventTopic != "" {
+					err = RegisterEventForTrigger(sl.TriggerPath, sl.EventTopic, false)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			err = service.store.DeleteAllSoftlinksForDataSpaceItem(child)
+			if err != nil {
+				return err
+			}
+		}
 		service.store.PutDataSpace(appId, ds)
 
 	} else {
@@ -172,36 +190,43 @@ func (service *NamespaceService) ChangePermissions(dataSpaceItemPath string, per
 
 	var toDelete []model.Softlink
 	for _, sl := range softlinks {
+		var base int
 		if sl.Type == model.Group {
-			if dsi.Permissions[5] != 's' {
-				toDelete = append(toDelete, sl)
-				//ovde dodati neko brisanje sl
-			}
-			if dsi.Permissions[6] != 'x' {
-				sl.StoredProcedurePath = ""
-				sl.JsonParameters = ""
-				service.store.PutSoftlink(&sl)
-			}
+			base = 0
 
 		} else if sl.Type == model.Others {
-			if dsi.Permissions[8] != 's' {
-				toDelete = append(toDelete, sl)
-				//ovde dodati neko brisanje sl
-			}
-			if dsi.Permissions[9] != 'x' {
-				sl.StoredProcedurePath = ""
-				sl.JsonParameters = ""
-				service.store.PutSoftlink(&sl)
-			}
+			base = 3
 		}
 
-		if len(toDelete) > 0 {
-			err = service.store.DeleteAllSoftlinksFromList(toDelete)
-			if err != nil {
-				return err
+		if dsi.Permissions[5+base] != 's' {
+			toDelete = append(toDelete, sl)
+			if sl.TriggerPath != "" && sl.EventTopic != "" {
+				err = RegisterEventForTrigger(sl.TriggerPath, sl.EventTopic, false)
+				if err != nil {
+					return err
+				}
 			}
 		}
+		if dsi.Permissions[6+base] != 'x' {
+			sl.StoredProcedurePath = ""
+			sl.JsonParameters = ""
+			if sl.TriggerPath != "" && sl.EventTopic != "" {
+				err = RegisterEventForTrigger(sl.TriggerPath, sl.EventTopic, false)
+				if err != nil {
+					return err
+				}
+			}
+			sl.TriggerPath = ""
+			sl.EventTopic = ""
+			service.store.PutSoftlink(&sl)
+		}
+	}
 
+	if len(toDelete) > 0 {
+		err = service.store.DeleteAllSoftlinksFromList(toDelete)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = service.store.PutDataSpaceItem(dsi)

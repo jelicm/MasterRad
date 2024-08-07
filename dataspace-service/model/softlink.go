@@ -14,4 +14,6 @@ type Softlink struct {
 	StoredProcedurePath string `json:"storedProcedurePath"`
 	JsonParameters      string `json:"jsonParameters"`
 	Type                SLType `json:"slType"`
+	TriggerPath         string `json:"triggerPath"`
+	EventTopic          string `json:"eventTopic"`
 }

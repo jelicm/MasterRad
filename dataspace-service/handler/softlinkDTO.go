@@ -8,4 +8,6 @@ type SoftlinkDTO struct {
 	DataItemPath        string `json:"dataitemPath"`
 	StoredProcedurePath string `json:"storedProcedurePath"`
 	JsonParameters      string `json:"jsonParameters"`
+	TriggerPath         string `json:"triggerPath"`
+	EventTopic          string `json:"eventTopic"`
 }

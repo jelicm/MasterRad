@@ -1,0 +1,11 @@
+services:
+  nats:
+    build: ./nats
+    ports:
+      - 4222:4222
+
+  app:
+    build: .
+    ports:
+    - 8000:8000
+    

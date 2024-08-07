@@ -8,8 +8,7 @@ services:
       - "4222"
     ports:
       - "4222:4222"
-    networks:
-      - master
+    network_mode: host
   etcd:
     image: 'bitnami/etcd:latest'
     container_name: etcd
@@ -19,8 +18,7 @@ services:
     ports:
       - 2379:2379
       - 2380:2380
-    networks:
-      - master
+    network_mode: host
   #service:
   #  image: ds_service
   #  container_name: ds_service

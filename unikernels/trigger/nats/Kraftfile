@@ -1,0 +1,7 @@
+spec: v0.6
+
+runtime: base:latest
+
+rootfs: ./Dockerfile
+
+cmd: ["/nats-server", "-c", "/etc/nats/nats.conf"]

@@ -22,3 +22,4 @@ go.work
 go.work.sum
 
 /unikernels/.unikraft/build
+/unikernels/trigger/.unikraft

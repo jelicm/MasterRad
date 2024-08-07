@@ -13,6 +13,11 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+type EventDTO struct {
+	EventTopic string `json:"event"`
+	AddEvent   bool   `json:"add"`
+}
+
 type ApplicationService struct {
 	store model.Store
 	conn  *nats.Conn
@@ -136,7 +141,7 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string) (*string, error) {
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string, triggerPath string, eventTopic string) (*string, error) {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	sltype := model.Others
 
@@ -153,6 +158,8 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 			//ako nema permisije, onda idu prazni stringovi
 			storedProcedurePath = ""
 			jsonParams = ""
+			triggerPath = ""
+			eventTopic = ""
 		}
 	}
 
@@ -165,9 +172,18 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		if dsi.Permissions[6] != 'x' {
 			storedProcedurePath = ""
 			jsonParams = ""
+			triggerPath = ""
+			eventTopic = ""
 		}
 
 		sltype = model.Group
+	}
+
+	if triggerPath != "" && eventTopic != "" {
+		err = RegisterEventForTrigger(triggerPath, eventTopic, true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	softlink := model.Softlink{
@@ -177,6 +193,8 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		StoredProcedurePath: storedProcedurePath,
 		JsonParameters:      jsonParams,
 		Type:                sltype,
+		TriggerPath:         triggerPath,
+		EventTopic:          eventTopic,
 	}
 	err = service.store.PutSoftlink(&softlink)
 	if err != nil {
@@ -257,6 +275,37 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 	return err
 }
 
+func RegisterEventForTrigger(triggerPath string, eventTopic string, add bool) error {
+
+	event := EventDTO{EventTopic: eventTopic, AddEvent: add}
+	jsonData, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", triggerPath, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading response body:", err)
+		return err
+	}
+	fmt.Println("Response:", string(body))
+
+	return nil
+}
 func isValidJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
