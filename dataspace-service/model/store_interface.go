@@ -20,4 +20,5 @@ type Store interface {
 	GetSoftlink(dsiPath string, appId string) (*Softlink, error)
 	GetAllSoftLinksForDataSpaceItem(dsiPath string) ([]Softlink, error)
 	DeleteAllSoftlinksFromList(softlinks []Softlink) error
+	ReplaceDataSpaceItemAndScheme(oldPath string, dsi *DataSpaceItem) error
 }

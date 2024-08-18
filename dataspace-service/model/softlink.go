@@ -8,12 +8,12 @@ const (
 )
 
 type Softlink struct {
-	SoftlinkID          string `json:"softlinkID"`
-	ApplicationID       string `json:"appID"`
-	DataSpaceItemPath   string `json:"path"`
-	StoredProcedurePath string `json:"storedProcedurePath"`
-	JsonParameters      string `json:"jsonParameters"`
-	Type                SLType `json:"slType"`
-	TriggerPath         string `json:"triggerPath"`
-	EventTopic          string `json:"eventTopic"`
+	SoftlinkID          string      `json:"softlinkID"`
+	Application         Application `json:"app"`
+	DataSpaceItemPath   string      `json:"path"`
+	StoredProcedurePath string      `json:"storedProcedurePath"`
+	JsonParameters      string      `json:"jsonParameters"`
+	Type                SLType      `json:"slType"`
+	TriggerPath         string      `json:"triggerPath"`
+	EventTopic          string      `json:"eventTopic"`
 }

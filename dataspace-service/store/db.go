@@ -153,7 +153,7 @@ func (db *DB) PutSoftlink(softlink *model.Softlink) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	key := key(softlink.DataSpaceItemPath, softlink.ApplicationID, softlinkKey)
+	key := key(softlink.DataSpaceItemPath, softlink.Application.ApplicationId, softlinkKey)
 
 	jsonData, err := json.Marshal(softlink)
 	if err != nil {
@@ -437,7 +437,7 @@ func (db *DB) DeleteAllSoftlinksFromList(softlinks []model.Softlink) error {
 	ops := []clientv3.Op{}
 
 	for _, sl := range softlinks {
-		ops = append(ops, clientv3.OpDelete(key(sl.DataSpaceItemPath, sl.ApplicationID, softlinkKey)))
+		ops = append(ops, clientv3.OpDelete(key(sl.DataSpaceItemPath, sl.Application.ApplicationId, softlinkKey)))
 	}
 
 	if len(ops) > 0 {
@@ -450,5 +450,38 @@ func (db *DB) DeleteAllSoftlinksFromList(softlinks []model.Softlink) error {
 		fmt.Println("No keys with requested prefix!")
 	}
 
+	return nil
+}
+
+func (db *DB) ReplaceDataSpaceItemAndScheme(oldPath string, dsi *model.DataSpaceItem) error {
+	ops := []clientv3.Op{}
+
+	jsonData, err := json.Marshal(dsi)
+	if err != nil {
+		return err
+	}
+
+	ops = append(ops, clientv3.OpDelete("dataspaceitem/"+oldPath))
+	ops = append(ops, clientv3.OpPut(key(dsi.Path, dsi.Name, dataSpaceItemKey), string(jsonData)))
+	if dsi.Scheme {
+		oldKey := key_one(oldPath, schemeKey)
+		resp, err := db.Kv.Get(context.Background(), oldKey)
+		if err != nil {
+			return err
+		}
+		if len(resp.Kvs) == 0 {
+			return errors.New("no scheme for the given key")
+		}
+		scheme := resp.Kvs[0].Value
+
+		ops = append(ops, clientv3.OpDelete(oldKey))
+		ops = append(ops, clientv3.OpPut(key_one(dsi.GetFullPath(), schemeKey), string(scheme)))
+
+	}
+
+	_, err = db.Kv.Txn(context.Background()).Then(ops...).Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }

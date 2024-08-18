@@ -141,7 +141,7 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 }
 
 // znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string, triggerPath string, eventTopic string) (*string, error) {
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string, triggerPath string, eventTopic string, slId string) (*string, error) {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	sltype := model.Others
 
@@ -186,9 +186,13 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		}
 	}
 
+	if slId == "" {
+		slId = app2.ApplicationId + "+" + dataSpaceItemPath
+	}
+
 	softlink := model.Softlink{
-		SoftlinkID:          app2.ApplicationId + "+" + dataSpaceItemPath,
-		ApplicationID:       app2.ApplicationId,
+		SoftlinkID:          slId,
+		Application:         *app2,
 		DataSpaceItemPath:   dataSpaceItemPath,
 		StoredProcedurePath: storedProcedurePath,
 		JsonParameters:      jsonParams,
@@ -213,7 +217,7 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 	_, err := service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
 		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
 
-		sl, err := service.store.GetSoftlink(softlink.DataSpaceItemPath, softlink.ApplicationID)
+		sl, err := service.store.GetSoftlink(softlink.DataSpaceItemPath, softlink.Application.ApplicationId)
 
 		if err != nil {
 			return
@@ -268,8 +272,8 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 				return
 			}
 			fmt.Println("Response:", string(body))
-		}
 
+		}
 	})
 
 	return err
@@ -309,4 +313,89 @@ func RegisterEventForTrigger(triggerPath string, eventTopic string, add bool) er
 func isValidJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 model.Application, deleteLinks bool) error {
+	// hoćemo da prevežemo od app1 ds na app2, pa posle da se obriše app1
+	//	za sada sa pretpostavkom da je sve validirano
+	ds1, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	ds2, err := service.store.GetDataSpace(app2.ApplicationId, app2.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	dsis1, err := service.store.GetAllDataSpaceItemsForDataSpace(ds1.DataSpaceId)
+
+	if err != nil {
+		return err
+	}
+
+	//false root in order to avoid conflict names
+	falseRoot := model.DataSpaceItem{Name: "Root", Path: ds2.DataSpaceId + "/Root/" + ds1.DataSpaceId, SizeKB: 1, IsLeaf: true, State: model.Custom, Scheme: false}
+	service.CreateDataItem(app2.ApplicationId, &falseRoot, "", true)
+	for _, dsiPath := range dsis1 {
+		dsi, err := service.store.GetDataSpaceItem(dsiPath)
+		if err != nil {
+			return err
+		}
+
+		oldPath := dsi.GetFullPath()
+		dsi.Path = ds2.DataSpaceId + "/Root/" + dsi.Path
+		//dsi2id/root/dsi1id/root/.... za sada, videti posle
+
+		if deleteLinks {
+			fmt.Println("brisanje")
+			service.store.DeleteAllSoftlinksForDataSpaceItem(dsiPath)
+			dsi.State = model.Closed
+		} else {
+			fmt.Println("menjanje sl pa njihovo ponovno cuvanje, slID ostaje isti")
+			//ponovno kreiranje softlinkova
+			softlinks, err := service.store.GetAllSoftLinksForDataSpaceItem(dsiPath)
+			if err != nil {
+				return err
+			}
+
+			for _, sl := range softlinks {
+				app, err := service.store.GetApp(sl.Application.ParentNamespaceId, sl.Application.ApplicationId)
+				if err != nil {
+					return err
+				}
+				_, err = service.CreateSoftlink(&app2, app, dsi.GetFullPath(), sl.StoredProcedurePath, sl.JsonParameters, sl.TriggerPath, sl.EventTopic, sl.SoftlinkID)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = service.store.DeleteAllSoftlinksForDataSpaceItem(oldPath)
+			if err != nil {
+				return err
+			}
+			if dsi.State == model.Open {
+				ds2.OpenItems = append(ds2.OpenItems, dsiPath)
+			}
+		}
+
+		//replace dsi and scheme if exists
+		err = service.store.ReplaceDataSpaceItemAndScheme(oldPath, dsi)
+		if err != nil {
+			return err
+		}
+
+	}
+	//save ds2 because openItems is changed
+	err = service.store.PutDataSpace(app2.ApplicationId, ds2)
+	if err != nil {
+		return err
+	}
+	//ds1 and app1 can be deleted now
+	err = service.store.DeleteAppDefault(&app1)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
