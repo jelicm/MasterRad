@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "proto/message";
+
+package proto;
+
+service Meridian {
+  rpc SendMessage(SendMess) returns (SendMessResp) {}
+}
+
+message SendMess {
+    string poruka = 1;
+}
+
+message SendMessResp {
+    string odg = 1;
+}

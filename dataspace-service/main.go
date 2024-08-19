@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"projekat/handler"
+	"projekat/proto/message"
 	"projekat/service"
 	"projekat/store"
 
 	"github.com/gorilla/mux"
 	"github.com/nats-io/nats.go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -31,6 +36,21 @@ func main() {
 	nsService := service.NewNamespaceService(db)
 
 	appHandler := handler.NewAppHandler(appservice, nsService)
+
+	conn_grpc, err := grpc.Dial("localhost:8000", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn_grpc.Close()
+
+	productService := message.NewMeridianClient(conn_grpc)
+
+	getResp, err := productService.SendMessage(context.Background(), &message.SendMess{Poruka: "porukica"})
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(getResp.Odg)
+	}
 
 	r := mux.NewRouter()
 
