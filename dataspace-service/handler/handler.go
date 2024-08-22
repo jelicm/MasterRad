@@ -174,3 +174,18 @@ func (handler *AppHandler) PutScheme(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("scheme added"))
 }
+
+func (handler *AppHandler) DeleteAppWithMerge(w http.ResponseWriter, r *http.Request) {
+	var mergeDTO MergeDTO
+	err := json.NewDecoder(r.Body).Decode(&mergeDTO)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = handler.appservice.DeleteAppWithMerge(mergeDTO.Application1Id, mergeDTO.Application2Id, mergeDTO.Namespace1Id, mergeDTO.Namespace2Id, mergeDTO.DeleteLinks)
+	if err != nil {
+		writeErrorResp(err, w)
+		return
+	}
+	writeResp(nil, w)
+}

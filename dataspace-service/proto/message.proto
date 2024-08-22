@@ -5,13 +5,18 @@ option go_package = "proto/message";
 package proto;
 
 service Meridian {
-  rpc SendMessage(SendMess) returns (SendMessResp) {}
+  rpc BorrowResources (BorrowResourcesReq) returns (BorrowResourcesResp) {}
 }
 
-message SendMess {
-    string poruka = 1;
+message BorrowResourcesReq {
+    string app1Id = 1;
+    string app2Id = 2;
+    string namespace1Id = 3;
+    string namespace2Id = 4;
+    double diskResources = 5;
 }
 
-message SendMessResp {
-    string odg = 1;
+message BorrowResourcesResp {
+    string reply = 1;
+    bool done = 2;
 }

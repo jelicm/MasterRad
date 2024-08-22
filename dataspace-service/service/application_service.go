@@ -2,12 +2,15 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"projekat/model"
+	"projekat/proto/message"
 	"strings"
 
 	"github.com/nats-io/nats.go"
@@ -19,14 +22,16 @@ type EventDTO struct {
 }
 
 type ApplicationService struct {
-	store model.Store
-	conn  *nats.Conn
+	store    model.Store
+	conn     *nats.Conn
+	meridian message.MeridianClient
 }
 
-func NewApplicationService(store model.Store, conn *nats.Conn) *ApplicationService {
+func NewApplicationService(store model.Store, conn *nats.Conn, meridian message.MeridianClient) *ApplicationService {
 	return &ApplicationService{
-		store: store,
-		conn:  conn,
+		store:    store,
+		conn:     conn,
+		meridian: meridian,
 	}
 }
 
@@ -333,7 +338,6 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 	if err != nil {
 		return err
 	}
-
 	//false root in order to avoid conflict names
 	falseRoot := model.DataSpaceItem{Name: "Root", Path: ds2.DataSpaceId + "/Root/" + ds1.DataSpaceId, SizeKB: 1, IsLeaf: true, State: model.Custom, Scheme: false}
 	service.CreateDataItem(app2.ApplicationId, &falseRoot, "", true)
@@ -397,5 +401,38 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 		return err
 	}
 
+	return nil
+}
+
+func (service *ApplicationService) DeleteAppWithMerge(app1Id, app2Id string, ns1Id, ns2Id string, deleteLinks bool) error {
+
+	app1, err := service.store.GetApp(ns1Id, app1Id)
+	if err != nil {
+		return err
+	}
+
+	app2, err := service.store.GetApp(ns2Id, app2Id)
+	if err != nil {
+		return err
+	}
+
+	ds1, err := service.store.GetDataSpace(app1Id, app1.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	//videti za koje resurse da se pita
+	resp, err := service.meridian.BorrowResources(context.Background(), &message.BorrowResourcesReq{App1Id: app1Id, App2Id: app2Id, Namespace1Id: ns1Id, Namespace2Id: ns2Id, DiskResources: float64(ds1.SizeKB)})
+	if err != nil {
+		return err
+	}
+
+	if resp.Done {
+		fmt.Println(resp.Reply)
+		service.MergeDataSpaces(*app1, *app2, deleteLinks)
+	} else {
+		fmt.Println(resp.Reply)
+		return errors.New(resp.Reply)
+	}
 	return nil
 }

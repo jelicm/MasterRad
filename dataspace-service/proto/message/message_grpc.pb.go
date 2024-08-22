@@ -19,14 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Meridian_SendMessage_FullMethodName = "/proto.Meridian/SendMessage"
+	Meridian_BorrowResources_FullMethodName = "/proto.Meridian/BorrowResources"
 )
 
 // MeridianClient is the client API for Meridian service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MeridianClient interface {
-	SendMessage(ctx context.Context, in *SendMess, opts ...grpc.CallOption) (*SendMessResp, error)
+	BorrowResources(ctx context.Context, in *BorrowResourcesReq, opts ...grpc.CallOption) (*BorrowResourcesResp, error)
 }
 
 type meridianClient struct {
@@ -37,9 +37,9 @@ func NewMeridianClient(cc grpc.ClientConnInterface) MeridianClient {
 	return &meridianClient{cc}
 }
 
-func (c *meridianClient) SendMessage(ctx context.Context, in *SendMess, opts ...grpc.CallOption) (*SendMessResp, error) {
-	out := new(SendMessResp)
-	err := c.cc.Invoke(ctx, Meridian_SendMessage_FullMethodName, in, out, opts...)
+func (c *meridianClient) BorrowResources(ctx context.Context, in *BorrowResourcesReq, opts ...grpc.CallOption) (*BorrowResourcesResp, error) {
+	out := new(BorrowResourcesResp)
+	err := c.cc.Invoke(ctx, Meridian_BorrowResources_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (c *meridianClient) SendMessage(ctx context.Context, in *SendMess, opts ...
 // All implementations must embed UnimplementedMeridianServer
 // for forward compatibility
 type MeridianServer interface {
-	SendMessage(context.Context, *SendMess) (*SendMessResp, error)
+	BorrowResources(context.Context, *BorrowResourcesReq) (*BorrowResourcesResp, error)
 	mustEmbedUnimplementedMeridianServer()
 }
 
@@ -58,8 +58,8 @@ type MeridianServer interface {
 type UnimplementedMeridianServer struct {
 }
 
-func (UnimplementedMeridianServer) SendMessage(context.Context, *SendMess) (*SendMessResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
+func (UnimplementedMeridianServer) BorrowResources(context.Context, *BorrowResourcesReq) (*BorrowResourcesResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BorrowResources not implemented")
 }
 func (UnimplementedMeridianServer) mustEmbedUnimplementedMeridianServer() {}
 
@@ -74,20 +74,20 @@ func RegisterMeridianServer(s grpc.ServiceRegistrar, srv MeridianServer) {
 	s.RegisterService(&Meridian_ServiceDesc, srv)
 }
 
-func _Meridian_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SendMess)
+func _Meridian_BorrowResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BorrowResourcesReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MeridianServer).SendMessage(ctx, in)
+		return srv.(MeridianServer).BorrowResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Meridian_SendMessage_FullMethodName,
+		FullMethod: Meridian_BorrowResources_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MeridianServer).SendMessage(ctx, req.(*SendMess))
+		return srv.(MeridianServer).BorrowResources(ctx, req.(*BorrowResourcesReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -100,8 +100,8 @@ var Meridian_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*MeridianServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SendMessage",
-			Handler:    _Meridian_SendMessage_Handler,
+			MethodName: "BorrowResources",
+			Handler:    _Meridian_BorrowResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

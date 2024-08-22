@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -32,25 +30,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	appservice := service.NewApplicationService(db, conn)
-	nsService := service.NewNamespaceService(db)
-
-	appHandler := handler.NewAppHandler(appservice, nsService)
-
 	conn_grpc, err := grpc.Dial("localhost:8000", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn_grpc.Close()
 
-	productService := message.NewMeridianClient(conn_grpc)
+	meridianService := message.NewMeridianClient(conn_grpc)
 
-	getResp, err := productService.SendMessage(context.Background(), &message.SendMess{Poruka: "porukica"})
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(getResp.Odg)
-	}
+	appservice := service.NewApplicationService(db, conn, meridianService)
+	nsService := service.NewNamespaceService(db)
+
+	appHandler := handler.NewAppHandler(appservice, nsService)
 
 	r := mux.NewRouter()
 
@@ -62,13 +53,13 @@ func main() {
 	r.HandleFunc("/changeState", appHandler.ChangeDSIState).Methods("PUT")
 	r.HandleFunc("/changePermissions", appHandler.ChangePermissions).Methods("PUT")
 	r.HandleFunc("/putScheme", appHandler.PutScheme).Methods("PUT")
+	r.HandleFunc("/deleteAppMerge", appHandler.DeleteAppWithMerge).Methods("DELETE")
 
 	srv := &http.Server{
 		Handler: r,
 		Addr:    ":8001",
 	}
 	log.Fatal(srv.ListenAndServe())
-
 }
 
 func Conn() *nats.Conn {
