@@ -4,4 +4,4 @@ runtime: base:latest
 
 rootfs: ./Dockerfile
 
-cmd: ["/nats-server", "-c", "/etc/nats/nats.conf"]
+cmd: ["/server"]
