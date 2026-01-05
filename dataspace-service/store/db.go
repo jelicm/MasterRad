@@ -16,8 +16,8 @@ const (
 	//namespace/namespaceid
 	namespaceKey = "namespace/%s"
 
-	//scheme/pathToDSI
-	schemeKey = "scheme/%s"
+	//schema/pathToDSI
+	schemaKey = "schema/%s"
 
 	//application/namespaceId/applicationId
 	applicationKey = "application/%s/%s"
@@ -309,34 +309,55 @@ func (db *DB) GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, er
 
 func (db *DB) DeleteAppDefault(app *model.Application) error {
 	ops := []clientv3.Op{}
-	ops = append(ops, clientv3.OpDelete(key(app.ParentNamespaceId, app.ApplicationId, applicationKey)))
-	ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, app.DataSpaceId, dataSpaceKey)))
-
-	_, err := db.Kv.Txn(context.Background()).Then(ops...).Commit()
+	prefix := "dataspaceitem/" + app.DataSpaceId
+	resp, err := db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {
 		return err
 	}
 
+	for _, kv := range resp.Kvs {
+		ops = append(ops, clientv3.OpDelete(string(kv.Key)))
+	}
+
+	prefix = "schema/" + app.DataSpaceId
+	resp, err = db.Kv.Get(context.Background(), prefix, clientv3.WithPrefix())
+	if err != nil {
+		return err
+	}
+
+	for _, kv := range resp.Kvs {
+		ops = append(ops, clientv3.OpDelete(string(kv.Key)))
+	}
+
+	ops = append(ops, clientv3.OpDelete(key(app.ParentNamespaceId, app.ApplicationId, applicationKey)))
+	ops = append(ops, clientv3.OpDelete(key(app.ApplicationId, app.DataSpaceId, dataSpaceKey)))
+
+	_, err = db.Kv.Txn(context.Background()).Then(ops...).Commit()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%d \n", len(ops))
 	return nil
 }
 
-func (db *DB) PutScheme(path string, scheme string) error {
+func (db *DB) PutSchema(path string, schema string) error {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	key := key_one(path, schemeKey)
+	key := key_one(path, schemaKey)
 
-	_, err := db.Kv.Put(ctx, key, scheme)
+	_, err := db.Kv.Put(ctx, key, schema)
 
 	return err
 }
 
-func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
+func (db *DB) GetAllSchemas(schemas []string) ([]string, error) {
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
-	var schemeValues []string
-	for _, scheme := range schemes {
-		key := key_one(scheme, schemeKey)
+	var schemaValues []string
+	for _, schema := range schemas {
+		key := key_one(schema, schemaKey)
 		resp, err := db.Kv.Get(ctx, key)
 		if err != nil {
 			return nil, err
@@ -345,13 +366,13 @@ func (db *DB) GetAllSchemes(schemes []string) ([]string, error) {
 		if len(resp.Kvs) == 0 {
 			log.Fatalf("No data found for the key -dd")
 		}
-		schemeValues = append(schemeValues, string(resp.Kvs[0].Value))
+		schemaValues = append(schemaValues, string(resp.Kvs[0].Value))
 	}
 
-	return schemeValues, nil
+	return schemaValues, nil
 }
 
-func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.State, scheme bool) ([]string, error) {
+func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.State, schema bool) ([]string, error) {
 
 	ctx, cncl := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cncl()
@@ -371,8 +392,8 @@ func (db *DB) ChangeStateForAllChildren(dataSpaceItemPath string, state model.St
 			return nil, err
 		}
 		dsi.State = state
-		if scheme {
-			dsi.Scheme = true
+		if schema {
+			dsi.HasSchema = true
 		}
 		jsonData, err := json.Marshal(dsi)
 		if err != nil {
@@ -453,7 +474,7 @@ func (db *DB) DeleteAllSoftlinksFromList(softlinks []model.Softlink) error {
 	return nil
 }
 
-func (db *DB) ReplaceDataSpaceItemAndScheme(oldPath string, dsi *model.DataSpaceItem) error {
+func (db *DB) ReplaceDataSpaceItemAndSchema(oldPath string, dsi *model.DataSpaceItem) error {
 	ops := []clientv3.Op{}
 
 	jsonData, err := json.Marshal(dsi)
@@ -463,19 +484,19 @@ func (db *DB) ReplaceDataSpaceItemAndScheme(oldPath string, dsi *model.DataSpace
 
 	ops = append(ops, clientv3.OpDelete("dataspaceitem/"+oldPath))
 	ops = append(ops, clientv3.OpPut(key(dsi.Path, dsi.Name, dataSpaceItemKey), string(jsonData)))
-	if dsi.Scheme {
-		oldKey := key_one(oldPath, schemeKey)
+	if dsi.HasSchema {
+		oldKey := key_one(oldPath, schemaKey)
 		resp, err := db.Kv.Get(context.Background(), oldKey)
 		if err != nil {
 			return err
 		}
 		if len(resp.Kvs) == 0 {
-			return errors.New("no scheme for the given key")
+			return errors.New("no schema for the given key")
 		}
-		scheme := resp.Kvs[0].Value
+		schema := resp.Kvs[0].Value
 
 		ops = append(ops, clientv3.OpDelete(oldKey))
-		ops = append(ops, clientv3.OpPut(key_one(dsi.GetFullPath(), schemeKey), string(scheme)))
+		ops = append(ops, clientv3.OpPut(key_one(dsi.GetFullPath(), schemaKey), string(schema)))
 
 	}
 

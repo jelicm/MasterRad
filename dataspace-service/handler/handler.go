@@ -54,18 +54,18 @@ func (handler *AppHandler) RunDataDiscovery(w http.ResponseWriter, r *http.Reque
 
 }
 
-func (handler *AppHandler) AddDataItem(w http.ResponseWriter, r *http.Request) {
-	var di DataItemDTO
+func (handler *AppHandler) AddDataSpaceItem(w http.ResponseWriter, r *http.Request) {
+	var di DataSpaceItemDTO
 	err := json.NewDecoder(r.Body).Decode(&di)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	dataItem := model.DataSpaceItem{Path: di.Path, Name: di.Name, Permissions: di.Permissions,
-		Scheme: di.HasScheme, SizeKB: di.SizeKB, State: model.State(di.State)}
+	dataSpaceItem := model.DataSpaceItem{Path: di.Path, Name: di.Name, Permissions: di.Permissions,
+		HasSchema: di.HasSchema, SizeKB: di.SizeKB, State: model.State(di.State)}
 
-	rez, err := handler.appservice.CreateDataItem(di.AppID, &dataItem, di.Scheme, false)
+	rez, err := handler.appservice.CreateDataSpaceItem(di.AppID, &dataSpaceItem, di.Schema, false)
 
 	if err != nil {
 		log.Println(err)
@@ -93,7 +93,7 @@ func (handler *AppHandler) DeleteApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResp(nil, w)
+	writeRespOK(nil, w)
 }
 
 func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +106,7 @@ func (handler *AppHandler) CreateSoftlink(w http.ResponseWriter, r *http.Request
 
 	app1 := model.Application{ApplicationId: slDTO.Application1Id, ParentNamespaceId: slDTO.Namespace1Id}
 	app2 := model.Application{ApplicationId: slDTO.Application2Id, ParentNamespaceId: slDTO.Namespace2Id}
-	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataItemPath, slDTO.StoredProcedurePath, slDTO.JsonParameters, slDTO.TriggerPath, slDTO.EventTopic, "")
+	rez, err := handler.appservice.CreateSoftlink(&app1, &app2, slDTO.DataSpaceItemPath, slDTO.StoredProcedurePath, slDTO.JsonParameters, slDTO.TriggerPath, slDTO.EventTopic, "")
 
 	if err != nil {
 		log.Println(err)
@@ -126,7 +126,7 @@ func (handler *AppHandler) ChangeDSIState(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = handler.nsservice.ChangeDSIState(stateDTO.ApplicationId, stateDTO.DataSpaceItemPath, model.State(stateDTO.State), stateDTO.Scheme)
+	err = handler.nsservice.ChangeDSIState(stateDTO.ApplicationId, stateDTO.DataSpaceItemPath, model.State(stateDTO.State), stateDTO.Schema)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -156,15 +156,15 @@ func (handler *AppHandler) ChangePermissions(w http.ResponseWriter, r *http.Requ
 	w.Write([]byte("permissions changed"))
 }
 
-func (handler *AppHandler) PutScheme(w http.ResponseWriter, r *http.Request) {
-	var schemeDTO SchemeDTO
-	err := json.NewDecoder(r.Body).Decode(&schemeDTO)
+func (handler *AppHandler) PutSchema(w http.ResponseWriter, r *http.Request) {
+	var schemaDTO SchemaDTO
+	err := json.NewDecoder(r.Body).Decode(&schemaDTO)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = handler.nsservice.PutScheme(schemeDTO.DataSpaceItemPath, schemeDTO.Scheme)
+	err = handler.nsservice.PutSchema(schemaDTO.DataSpaceItemPath, schemaDTO.Schema)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -172,7 +172,7 @@ func (handler *AppHandler) PutScheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("scheme added"))
+	w.Write([]byte("schema added"))
 }
 
 func (handler *AppHandler) DeleteAppWithMerge(w http.ResponseWriter, r *http.Request) {

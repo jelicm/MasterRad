@@ -14,11 +14,11 @@ type Store interface {
 	GetAllDataSpaceItemsForDataSpace(dataSpaceId string) ([]string, error)
 	DeleteAppDefault(app *Application) error
 	GetNamespace(namespaceID string) (*Namsespace, error)
-	PutScheme(path string, scheme string) error
-	GetAllSchemes(schemes []string) ([]string, error)
-	ChangeStateForAllChildren(dataSpaceItemPath string, state State, scheme bool) ([]string, error)
+	PutSchema(path string, schema string) error
+	GetAllSchemas(schemas []string) ([]string, error)
+	ChangeStateForAllChildren(dataSpaceItemPath string, state State, schema bool) ([]string, error)
 	GetSoftlink(dsiPath string, appId string) (*Softlink, error)
 	GetAllSoftLinksForDataSpaceItem(dsiPath string) ([]Softlink, error)
 	DeleteAllSoftlinksFromList(softlinks []Softlink) error
-	ReplaceDataSpaceItemAndScheme(oldPath string, dsi *DataSpaceItem) error
+	ReplaceDataSpaceItemAndSchema(oldPath string, dsi *DataSpaceItem) error
 }

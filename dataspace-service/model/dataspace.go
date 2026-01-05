@@ -13,7 +13,7 @@ type DataSpaceItem struct {
 	Name        string `json:"name"`
 	SizeKB      int    `json:"sizeKb"`
 	State       State  `json:"state"`
-	Scheme      bool   `json:"scheme"`
+	HasSchema   bool   `json:"hasSchema"`
 	Permissions string `json:"permissions"`
 	IsLeaf      bool   `json:"isLeaf"`
 }

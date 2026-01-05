@@ -31,6 +31,20 @@ func writeResp(resp any, w http.ResponseWriter) {
 	w.Write(respBytes)
 }
 
+func writeRespOK(resp any, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusOK)
+	if resp == nil {
+		return
+	}
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(respBytes)
+}
+
 func readReq(req any, r *http.Request, w http.ResponseWriter) error {
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {

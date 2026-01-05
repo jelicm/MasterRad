@@ -21,23 +21,23 @@ func NewNamespaceService(store model.Store) *NamespaceService {
 func (service *NamespaceService) RunDataDiscovery(namespaceId string) []string {
 	apps, err := service.store.GetAllAppsForNamespace(namespaceId)
 	evaluateError(err)
-	var dataItems []string
+	var dataSpaceItemSchemas []string
 
 	for _, app := range apps {
 
 		ds, err := service.store.GetDataSpace(app.ApplicationId, app.DataSpaceId)
 		evaluateError(err)
-		itemsPaths, err := service.store.GetAllSchemes(ds.OpenItems)
+		itemSchemas, err := service.store.GetAllSchemas(ds.OpenItems)
 		evaluateError(err)
-		dataItems = append(dataItems, itemsPaths...)
+		dataSpaceItemSchemas = append(dataSpaceItemSchemas, itemSchemas...)
 
 	}
 
-	return dataItems
+	return dataSpaceItemSchemas
 }
 
 func (service *NamespaceService) DeleteAppDefault(nsId, appId string) error {
-	// default brisanje - brišemo i app i ds zajedno
+	// default delete - app and dataspace are both deleted
 	app, err := service.store.GetApp(nsId, appId)
 	if err != nil {
 		return err
@@ -47,12 +47,8 @@ func (service *NamespaceService) DeleteAppDefault(nsId, appId string) error {
 		return err
 	}
 
-	err = service.store.DeleteAppDefault(app)
-	if err != nil {
-		return err
-	}
-
-	//brisemo softlinkove za taj ds, proveravamo samo ono sto je open
+	// delete all softlinks, checking only open items since softlink cannot be binded to any other type
+	// TODO: fali odjava sa trigera?
 	for _, item := range ds.OpenItems {
 		err = service.store.DeleteAllSoftlinksForDataSpaceItem(item)
 		if err != nil {
@@ -60,10 +56,16 @@ func (service *NamespaceService) DeleteAppDefault(nsId, appId string) error {
 		}
 	}
 
+	// delete app, ds and all dsi and related schemas
+	err = service.store.DeleteAppDefault(app)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath string, state model.State, scheme string) error {
+func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath string, state model.State, schema string) error {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	if err != nil {
 		return err
@@ -89,8 +91,8 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 	}
 
 	if state == model.Open {
-		if scheme == "" {
-			return fmt.Errorf("no scheme")
+		if schema == "" {
+			return fmt.Errorf("no schema")
 		}
 		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, true)
 		if err != nil {
@@ -98,7 +100,7 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 		}
 		ds.OpenItems = append(ds.OpenItems, children...)
 		for _, child := range children {
-			service.store.PutScheme(child, scheme)
+			service.store.PutSchema(child, schema)
 		}
 		service.store.PutDataSpace(appId, ds)
 
@@ -146,27 +148,28 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 				ds.OpenItems = slices.Delete(ds.OpenItems, indx, indx)
 			}
 		}
+		service.store.PutDataSpace(appId, ds)
 	}
 	return nil
 }
 
-func (service *NamespaceService) PutScheme(dataSpaceItemPath string, scheme string) error {
-	if scheme == "" {
-		return fmt.Errorf("no scheme")
+func (service *NamespaceService) PutSchema(dataSpaceItemPath string, schema string) error {
+	if schema == "" {
+		return fmt.Errorf("no schema")
 	}
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	if err != nil {
 		return err
 	}
-	if !dsi.Scheme {
-		dsi.Scheme = true
+	if !dsi.HasSchema {
+		dsi.HasSchema = true
 		err = service.store.PutDataSpaceItem(dsi)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = service.store.PutScheme(dataSpaceItemPath, scheme)
+	err = service.store.PutSchema(dataSpaceItemPath, schema)
 	if err != nil {
 		return err
 	}

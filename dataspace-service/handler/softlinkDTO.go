@@ -5,7 +5,7 @@ type SoftlinkDTO struct {
 	Application2Id      string `json:"application2ID"`
 	Namespace1Id        string `json:"namespace1ID"`
 	Namespace2Id        string `json:"namespace2ID"`
-	DataItemPath        string `json:"dataitemPath"`
+	DataSpaceItemPath   string `json:"dataSpaceItemPath"`
 	StoredProcedurePath string `json:"storedProcedurePath"`
 	JsonParameters      string `json:"jsonParameters"`
 	TriggerPath         string `json:"triggerPath"`

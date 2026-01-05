@@ -47,12 +47,12 @@ func main() {
 
 	r.HandleFunc("/runApp", appHandler.RunApp).Methods("POST")
 	r.HandleFunc("/dataDiscovery/{nsId}", appHandler.RunDataDiscovery).Methods("GET")
-	r.HandleFunc("/addDataItem", appHandler.AddDataItem).Methods("POST")
+	r.HandleFunc("/addDataSpaceItem", appHandler.AddDataSpaceItem).Methods("POST")
 	r.HandleFunc("/deleteApp", appHandler.DeleteApp).Methods("DELETE")
 	r.HandleFunc("/softlink", appHandler.CreateSoftlink).Methods("POST")
 	r.HandleFunc("/changeState", appHandler.ChangeDSIState).Methods("PUT")
 	r.HandleFunc("/changePermissions", appHandler.ChangePermissions).Methods("PUT")
-	r.HandleFunc("/putScheme", appHandler.PutScheme).Methods("PUT")
+	r.HandleFunc("/putSchema", appHandler.PutSchema).Methods("PUT")
 	r.HandleFunc("/deleteAppMerge", appHandler.DeleteAppWithMerge).Methods("DELETE")
 
 	srv := &http.Server{
