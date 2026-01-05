@@ -1,5 +1,7 @@
 package main
 
+//An example application which serves as a reciever of messages sent from a unikernel
+
 import (
 	"fmt"
 	"log"
@@ -8,12 +10,10 @@ import (
 )
 
 func main() {
-	fmt.Println("neka funkcajo")
-
 	conn := Conn()
 	defer conn.Close()
 
-	//subject := "app1+novaapp0/Root/folder0"
+	//subject := "novaapp2+novaapp1/Root/folder0"
 
 	/*err := conn.Publish(subject, []byte("aaaajo"))
 	if err != nil {

@@ -2,12 +2,15 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"projekat/model"
+	"projekat/proto/message"
 	"strings"
 
 	"github.com/nats-io/nats.go"
@@ -19,14 +22,16 @@ type EventDTO struct {
 }
 
 type ApplicationService struct {
-	store model.Store
-	conn  *nats.Conn
+	store    model.Store
+	conn     *nats.Conn
+	meridian message.MeridianClient
 }
 
-func NewApplicationService(store model.Store, conn *nats.Conn) *ApplicationService {
+func NewApplicationService(store model.Store, conn *nats.Conn, meridian message.MeridianClient) *ApplicationService {
 	return &ApplicationService{
-		store: store,
-		conn:  conn,
+		store:    store,
+		conn:     conn,
+		meridian: meridian,
 	}
 }
 
@@ -45,7 +50,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	}
 
 	fmt.Printf("ApplicationId: %s, ParentNamespaceId: %s\n", app.ApplicationId, app.ParentNamespaceId)
-	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, SizeKB: 1, IsLeaf: true, State: model.Custom, Scheme: false}
+	root := model.DataSpaceItem{Name: "Root", Path: app.ApplicationId, SizeKB: 1, IsLeaf: true, State: model.Custom, HasSchema: false}
 	ds := model.DataSpace{
 		DataSpaceId: app.ApplicationId,
 		SizeKB:      sizeKB / 2,
@@ -54,7 +59,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 		OpenItems:   []string{},
 	}
 
-	service.CreateDataItem(app.ApplicationId, &root, "", true)
+	service.CreateDataSpaceItem(app.ApplicationId, &root, "", true)
 
 	err = service.store.PutDataSpace(app.ApplicationId, &ds)
 	if err != nil {
@@ -62,7 +67,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	}
 	fmt.Printf("DataSpace ds: %d;\n", ds.SizeKB)
 
-	//kad se kreira ds, odmah se kreira i hl
+	//after dataspace creation, the hard link is created between application and ds
 	hardlink := model.Hardlink{
 		ApplicationID: app.ApplicationId,
 		DataSpaceID:   ds.DataSpaceId,
@@ -75,8 +80,7 @@ func (service *ApplicationService) RunApplication(applicationId, parentNamespace
 	return &app, nil
 }
 
-func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataSpaceItem, scheme string, root bool) (*model.DataSpaceItem, error) {
-	//treba neka validacija za root name, tj ili zabraniti da bude name root ako nije root, ili neka drugačija provera
+func (service *ApplicationService) CreateDataSpaceItem(appID string, dsi *model.DataSpaceItem, schema string, root bool) (*model.DataSpaceItem, error) {
 
 	if !root {
 		ds, err := service.store.GetDataSpace(appID, strings.Split(dsi.Path, "/")[0])
@@ -89,24 +93,23 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 			return nil, err
 		}
 
-		//ignorisemo state ako je poslao korisnik jer roditelj ima vece privilegije
+		// If the parent is not in custom mode, the child inherits the parent's state.
 		if dsiParent.State != model.Custom {
 			dsi.State = dsiParent.State
 		}
 
-		//ovo videti da li je validno i da li treba neka validacija da vrati 400 ako nema seme za open
-		dsi.Scheme = scheme != ""
+		dsi.HasSchema = schema != ""
 
 		if dsi.State != model.Open {
 			dsi.SetDefaultPermissions()
 		}
 
-		if dsi.State == model.Open && dsi.Scheme {
+		if dsi.State == model.Open && dsi.HasSchema {
 			ds.OpenItems = append(ds.OpenItems, dsi.GetFullPath())
 		}
 
 		if ds.UsedKB+dsi.SizeKB > ds.SizeKB {
-			log.Fatal("cannot add dataitem - no available resources")
+			log.Fatal("cannot add dataSpaceItem - no available resources")
 		}
 
 		ds.UsedKB += dsi.SizeKB
@@ -123,10 +126,9 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 			}
 		}
 	}
-	//transakcija?
 
-	if dsi.Scheme {
-		err := service.store.PutScheme(dsi.Path+"/"+dsi.Name, scheme)
+	if dsi.HasSchema {
+		err := service.store.PutSchema(dsi.Path+"/"+dsi.Name, schema)
 		if err != nil {
 			return nil, err
 		}
@@ -140,22 +142,23 @@ func (service *ApplicationService) CreateDataItem(appID string, dsi *model.DataS
 
 }
 
-// znamo od koje aplikacije uzimamo, a ne znamo direktno id od namespace-a
-func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string, triggerPath string, eventTopic string) (*string, error) {
+// app2 wants to create sl to app1's dataa
+func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application, dataSpaceItemPath string, storedProcedurePath string, jsonParams string, triggerPath string, eventTopic string, slId string) (*string, error) {
 	dsi, err := service.store.GetDataSpaceItem(dataSpaceItemPath)
 	sltype := model.Others
 
 	if err != nil {
 		return nil, err
 	}
+	//apps are not in the same namespace
 	if app1.ParentNamespaceId != app2.ParentNamespaceId {
-		//nije isti rns i others nema prava pristupa
+
 		if dsi.Permissions[8] != 's' {
-			return nil, fmt.Errorf("no privilages for this data - others")
+			return nil, fmt.Errorf("no privilages for this data - type others")
 		}
 
+		//no permissions for execution - empty strings
 		if dsi.Permissions[9] != 'x' {
-			//ako nema permisije, onda idu prazni stringovi
 			storedProcedurePath = ""
 			jsonParams = ""
 			triggerPath = ""
@@ -163,12 +166,13 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		}
 	}
 
+	// apps are in the same namespace
 	if app1.ParentNamespaceId == app2.ParentNamespaceId {
 		if dsi.Permissions[5] != 's' {
-			//group nema dobre privilegije
-			return nil, fmt.Errorf("no privilages for this data - group")
+			return nil, fmt.Errorf("no privilages for this data - type group")
 		}
 
+		//no permissions for execution - empty strings
 		if dsi.Permissions[6] != 'x' {
 			storedProcedurePath = ""
 			jsonParams = ""
@@ -186,9 +190,13 @@ func (service *ApplicationService) CreateSoftlink(app1, app2 *model.Application,
 		}
 	}
 
+	if slId == "" {
+		slId = app2.ApplicationId + "+" + dataSpaceItemPath
+	}
+
 	softlink := model.Softlink{
-		SoftlinkID:          app2.ApplicationId + "+" + dataSpaceItemPath,
-		ApplicationID:       app2.ApplicationId,
+		SoftlinkID:          slId,
+		Application:         *app2,
 		DataSpaceItemPath:   dataSpaceItemPath,
 		StoredProcedurePath: storedProcedurePath,
 		JsonParameters:      jsonParams,
@@ -213,14 +221,14 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 	_, err := service.conn.QueueSubscribe(softlink.SoftlinkID, "softlinks", func(message *nats.Msg) {
 		fmt.Printf("RECEIVED MESSAGE: %s\n", string(message.Data))
 
-		sl, err := service.store.GetSoftlink(softlink.DataSpaceItemPath, softlink.ApplicationID)
+		sl, err := service.store.GetSoftlink(softlink.DataSpaceItemPath, softlink.Application.ApplicationId)
 
 		if err != nil {
 			return
 		}
 
 		if sl.StoredProcedurePath == "" {
-			fmt.Println("nema path-a")
+			fmt.Println("no path for stored procedure")
 			return
 		}
 
@@ -242,8 +250,8 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 			fmt.Println("Response:", string(body))
 		} else {
 			if !isValidJSON(sl.JsonParameters) {
-				//videti ovde za te povratne vrednosti sta zezaju ovi errori
-				fmt.Println("nije validan json")
+				// TODO: videti ovde za te povratne vrednosti sta zezaju ovi errori
+				fmt.Println("JSON is not valid!")
 				return
 			}
 
@@ -268,15 +276,15 @@ func (service *ApplicationService) createTopicForSoftLink(softlink *model.Softli
 				return
 			}
 			fmt.Println("Response:", string(body))
-		}
 
+		}
 	})
 
 	return err
 }
 
 func RegisterEventForTrigger(triggerPath string, eventTopic string, add bool) error {
-
+	// if add is true, register, if false, unregister
 	event := EventDTO{EventTopic: eventTopic, AddEvent: add}
 	jsonData, err := json.Marshal(event)
 	if err != nil {
@@ -309,4 +317,121 @@ func RegisterEventForTrigger(triggerPath string, eventTopic string, add bool) er
 func isValidJSON(s string) bool {
 	var js interface{}
 	return json.Unmarshal([]byte(s), &js) == nil
+}
+
+func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 model.Application, deleteLinks bool) error {
+	// hoćemo da prevežemo od app1 ds na app2, pa posle da se obriše app1
+	//	za sada sa pretpostavkom da je sve validirano
+	ds1, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	ds2, err := service.store.GetDataSpace(app2.ApplicationId, app2.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	dsis1, err := service.store.GetAllDataSpaceItemsForDataSpace(ds1.DataSpaceId)
+
+	if err != nil {
+		return err
+	}
+	//false root in order to avoid conflict names
+	falseRoot := model.DataSpaceItem{Name: "Root", Path: ds2.DataSpaceId + "/Root/" + ds1.DataSpaceId, SizeKB: 1, IsLeaf: true, State: model.Custom, HasSchema: false}
+	service.CreateDataSpaceItem(app2.ApplicationId, &falseRoot, "", true)
+	for _, dsiPath := range dsis1 {
+		dsi, err := service.store.GetDataSpaceItem(dsiPath)
+		if err != nil {
+			return err
+		}
+
+		oldPath := dsi.GetFullPath()
+		dsi.Path = ds2.DataSpaceId + "/Root/" + dsi.Path
+		//dsi2id/root/dsi1id/root/.... za sada, videti posle
+
+		if deleteLinks {
+			fmt.Println("brisanje")
+			service.store.DeleteAllSoftlinksForDataSpaceItem(dsiPath)
+			dsi.State = model.Closed
+		} else {
+			fmt.Println("menjanje sl pa njihovo ponovno cuvanje, slID ostaje isti")
+			//ponovno kreiranje softlinkova
+			softlinks, err := service.store.GetAllSoftLinksForDataSpaceItem(dsiPath)
+			if err != nil {
+				return err
+			}
+
+			for _, sl := range softlinks {
+				app, err := service.store.GetApp(sl.Application.ParentNamespaceId, sl.Application.ApplicationId)
+				if err != nil {
+					return err
+				}
+				_, err = service.CreateSoftlink(&app2, app, dsi.GetFullPath(), sl.StoredProcedurePath, sl.JsonParameters, sl.TriggerPath, sl.EventTopic, sl.SoftlinkID)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = service.store.DeleteAllSoftlinksForDataSpaceItem(oldPath)
+			if err != nil {
+				return err
+			}
+			if dsi.State == model.Open {
+				ds2.OpenItems = append(ds2.OpenItems, dsiPath)
+			}
+		}
+
+		//replace dsi and schema if exists
+		err = service.store.ReplaceDataSpaceItemAndSchema(oldPath, dsi)
+		if err != nil {
+			return err
+		}
+
+	}
+	//save ds2 because openItems is changed
+	err = service.store.PutDataSpace(app2.ApplicationId, ds2)
+	if err != nil {
+		return err
+	}
+	//ds1 and app1 can be deleted now
+	err = service.store.DeleteAppDefault(&app1)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *ApplicationService) DeleteAppWithMerge(app1Id, app2Id string, ns1Id, ns2Id string, deleteLinks bool) error {
+
+	app1, err := service.store.GetApp(ns1Id, app1Id)
+	if err != nil {
+		return err
+	}
+
+	app2, err := service.store.GetApp(ns2Id, app2Id)
+	if err != nil {
+		return err
+	}
+
+	ds1, err := service.store.GetDataSpace(app1Id, app1.DataSpaceId)
+	if err != nil {
+		return err
+	}
+
+	//videti za koje resurse da se pita
+	resp, err := service.meridian.BorrowResources(context.Background(), &message.BorrowResourcesReq{App1Id: app1Id, App2Id: app2Id, Namespace1Id: ns1Id, Namespace2Id: ns2Id, DiskResources: float64(ds1.SizeKB)})
+	if err != nil {
+		return err
+	}
+
+	if resp.Done {
+		fmt.Println(resp.Reply)
+		service.MergeDataSpaces(*app1, *app2, deleteLinks)
+	} else {
+		fmt.Println(resp.Reply)
+		return errors.New(resp.Reply)
+	}
+	return nil
 }

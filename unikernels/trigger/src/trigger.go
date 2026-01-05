@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/nats-io/nats.go"
 )
 
 type EventDTO struct {
@@ -16,7 +18,7 @@ type EventDTO struct {
 
 type EventHandler struct {
 	EventTopics []string
-	//Conn        *nats.Conn
+	Conn        *nats.Conn
 }
 
 func (handler *EventHandler) helloPost(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +40,7 @@ func (handler *EventHandler) helloPost(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(rez))
 }
 
-/*func (handler *EventHandler) trigger() {
+func (handler *EventHandler) trigger() {
 	time.Sleep(2 * time.Second)
 	for _, topic := range handler.EventTopics {
 		err := handler.Conn.Publish(topic, []byte("aaaajo"))
@@ -51,12 +53,12 @@ func (handler *EventHandler) helloPost(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	fmt.Println("poslata porukica")
-}*/
+}
 
 func main() {
-	//handler := EventHandler{EventTopics: []string{}, Conn: Conn()}
-	handler := EventHandler{EventTopics: []string{}}
-	//handler.trigger()
+	handler := EventHandler{EventTopics: []string{}, Conn: Conn()}
+	//handler := EventHandler{EventTopics: []string{}}
+	handler.trigger()
 	r := mux.NewRouter()
 	r.HandleFunc("/", handler.helloPost).Methods("POST")
 	fmt.Println("Listening on :8000...")
@@ -67,10 +69,10 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-/*func Conn() *nats.Conn {
-	conn, err := nats.Connect("trigger-nats.internal:4222")
+func Conn() *nats.Conn {
+	conn, err := nats.Connect("10.0.2.2:4222")
 	if err != nil {
 		log.Fatal(err)
 	}
 	return conn
-}*/
+}
