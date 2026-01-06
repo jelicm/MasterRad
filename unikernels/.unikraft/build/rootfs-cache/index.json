@@ -1,1 +1,0 @@
-{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"sha256:373af26ef01e58452289d942688c44396b65f4ebd765557c83d7bc5abb28e35b","size":1228,"annotations":{"org.opencontainers.image.ref.name":"latest"}}]}

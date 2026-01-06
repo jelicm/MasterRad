@@ -2,21 +2,14 @@ FROM golang:1.22.5-bookworm AS build
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
-
-RUN go mod tidy
-RUN go mod download
-RUN go get github.com/gorilla/mux
-
-COPY ./server.go /src/server.go
+COPY ./src /src
 
 RUN set -xe; \
-    CGO_ENABLED=1 \
     go build \
       -buildmode=pie \
-      -ldflags "-linkmode external -extldflags '-static-pie'" \
+      -ldflags "-linkmode external -extldflags -static-pie" \
       -tags netgo \
-      -o /server server.go \
+      -o /server /src/... \
     ;
 
 FROM scratch
