@@ -81,7 +81,7 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 	}
 
 	if dsiParent.State != model.Custom {
-		return fmt.Errorf("cannot change state because parent is not custom")
+		return fmt.Errorf("cannot change state because parent's state is not custom")
 	}
 
 	dsId := strings.Split(dsi.Path, "/")[0]
@@ -94,17 +94,21 @@ func (service *NamespaceService) ChangeDSIState(appId string, dataSpaceItemPath 
 		if schema == "" {
 			return fmt.Errorf("no schema")
 		}
+		// Changes the state of the node and all its descendants.
 		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, true)
 		if err != nil {
 			return err
 		}
+
 		ds.OpenItems = append(ds.OpenItems, children...)
+		// All children use the same schema as this DSI, since their state is enforced by this node.
 		for _, child := range children {
 			service.store.PutSchema(child, schema)
 		}
 		service.store.PutDataSpace(appId, ds)
 
 	} else if state == model.Closed {
+		// Changes the state of the node and all its descendants.
 		children, err := service.store.ChangeStateForAllChildren(dsi.GetFullPath(), state, false)
 		if err != nil {
 			return err

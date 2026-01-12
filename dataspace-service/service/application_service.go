@@ -320,8 +320,7 @@ func isValidJSON(s string) bool {
 }
 
 func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 model.Application, deleteLinks bool) error {
-	// hoćemo da prevežemo od app1 ds na app2, pa posle da se obriše app1
-	//	za sada sa pretpostavkom da je sve validirano
+	// merge app1's ds with app2's ds
 	ds1, err := service.store.GetDataSpace(app1.ApplicationId, app1.DataSpaceId)
 	if err != nil {
 		return err
@@ -337,7 +336,7 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 	if err != nil {
 		return err
 	}
-	//false root in order to avoid conflict names
+	//false root in order to avoid conflict names TODO: check / after root
 	falseRoot := model.DataSpaceItem{Name: "Root", Path: ds2.DataSpaceId + "/Root/" + ds1.DataSpaceId, SizeKB: 1, IsLeaf: true, State: model.Custom, HasSchema: false}
 	service.CreateDataSpaceItem(app2.ApplicationId, &falseRoot, "", true)
 	for _, dsiPath := range dsis1 {
@@ -348,15 +347,14 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 
 		oldPath := dsi.GetFullPath()
 		dsi.Path = ds2.DataSpaceId + "/Root/" + dsi.Path
-		//dsi2id/root/dsi1id/root/.... za sada, videti posle
+		//dsi2id/root/dsi1id/root/....
 
 		if deleteLinks {
 			fmt.Println("brisanje")
 			service.store.DeleteAllSoftlinksForDataSpaceItem(dsiPath)
 			dsi.State = model.Closed
 		} else {
-			fmt.Println("menjanje sl pa njihovo ponovno cuvanje, slID ostaje isti")
-			//ponovno kreiranje softlinkova
+			//recreated softlinks, now they are binded to new ds
 			softlinks, err := service.store.GetAllSoftLinksForDataSpaceItem(dsiPath)
 			if err != nil {
 				return err
@@ -389,7 +387,7 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 		}
 
 	}
-	//save ds2 because openItems is changed
+	//save ds2 because list openItems is changed
 	err = service.store.PutDataSpace(app2.ApplicationId, ds2)
 	if err != nil {
 		return err
@@ -405,11 +403,13 @@ func (service *ApplicationService) MergeDataSpaces(app1 model.Application, app2 
 
 func (service *ApplicationService) DeleteAppWithMerge(app1Id, app2Id string, ns1Id, ns2Id string, deleteLinks bool) error {
 
+	// app which is going to be deleted
 	app1, err := service.store.GetApp(ns1Id, app1Id)
 	if err != nil {
 		return err
 	}
 
+	// new owner of the data
 	app2, err := service.store.GetApp(ns2Id, app2Id)
 	if err != nil {
 		return err

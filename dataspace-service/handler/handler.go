@@ -134,7 +134,7 @@ func (handler *AppHandler) ChangeDSIState(w http.ResponseWriter, r *http.Request
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("state changed"))
+	w.Write([]byte("State changed"))
 }
 
 func (handler *AppHandler) ChangePermissions(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func (handler *AppHandler) ChangePermissions(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("permissions changed"))
+	w.Write([]byte("Permissions changed!"))
 }
 
 func (handler *AppHandler) PutSchema(w http.ResponseWriter, r *http.Request) {
@@ -187,5 +187,5 @@ func (handler *AppHandler) DeleteAppWithMerge(w http.ResponseWriter, r *http.Req
 		writeErrorResp(err, w)
 		return
 	}
-	writeResp(nil, w)
+	writeRespOK(nil, w)
 }
